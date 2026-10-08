@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:22:41 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 14:50:55 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/08 16:25:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -96,7 +96,7 @@ static int	parse_option(t_ctx *ctx, const char *arg)
 				ctx->opts.t = 1;
 				break ;
 			default:
-				ctx->invalid_option = arg[i];
+				ctx->invalid = &arg[i];
 				return (-1);
 		}
 		i++;
@@ -155,14 +155,15 @@ static int	scan_args(int argc, char **argv, t_ctx *ctx, int *operand_count)
 		{
 			if (parse_option(ctx, argv[i]) == -1)
 			{
+				ctx->invalid_kind = ARG_SHORT;
 				ctx->fatal = FATAL_OPTION;
 				return (-1);
 			}
 		}
 		else if (arg_kind == ARG_LONG)
 		{
-			/* 1) observar qué hace realmente GNU con --algo */
-			/* 2) eso nos dirá qué información necesita guardar ctx->invalid_option */
+			ctx->invalid = argv[i];
+			ctx->invalid_kind = ARG_LONG;
 			ctx->fatal = FATAL_OPTION;
 			return (-1);
 		}
@@ -229,6 +230,13 @@ static int	scan_args(int argc, char **argv, t_ctx *ctx, int *operand_count)
  *
  * [DISEÑO] Si el usuario no escribe ningún operando, el parser NO añade ".".
  *          El "." implícito se gestionará posteriormente.
+ *
+ * operand_count == 0, significa que:
+ * Se han recorrido todos los argumentos de argv
+ * No se ha detectado ningún error de opciones
+ * Se han registrado las opciones válidas que hubiera (-l, -a, ...)
+ * No se ha encontrado ningún operando explícito
+ * Por tanto, el análisis ha terminado correctamente y no hay operandos que almacenar.
  */
 int	parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops)
 {
@@ -238,5 +246,14 @@ int	parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops)
 	init_ops(ops);
 	if (scan_args(argc, argv, ctx, &operand_count) == -1)
 		return (-1);
+	if (operand_count == 0)
+		return (0);
+	ops->items = malloc(sizeof(char *) * (operand_count + 1));
+	if (!ops->items)
+	{
+		ctx->fatal = FATAL_NOMEM;
+		return (-1);
+	}
+	store_operand(argc, argv, ops);
 	return (0);
 }

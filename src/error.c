@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:08:11 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 14:50:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/08 16:25:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,17 +28,23 @@
  */
 void	report_fatal(t_ctx *ctx)
 {
+	if (ctx->fatal = FATAL_NONE)
+		return ;
+	
+	ctx->status = 2;
+
 	if (ctx->fatal == FATAL_OPTION)
 	{
-		ctx->status = 2;
-		fprintf(stderr, "%s: invalid option -- '%c'\n", ctx->prog, ctx->invalid_option);
-		fprintf(stderr, "Try 'ls --help' for more information.\n");
+		if (ctx->invalid_kind == ARG_LONG)
+			fprintf(stderr, "%s: unrecognized option '%s'\n", ctx->prog, ctx->invalid);
+		else
+			fprintf(stderr, "%s: invalid option -- '%c'\n", ctx->prog, ctx->invalid[0]);
+		
+		fprintf(stderr, "Try '%s --help' for more information.\n", ctx->prog);
 	}
-	/*
 	else if (ctx->fatal == FATAL_NOMEM)
-	{
-
-	}
+		fprintf(stderr, "%s: memory exhausted\n", ctx->prog);
+	/*
 	else if (ctx->fatal == FATAL_WRITE)
 	{
 	

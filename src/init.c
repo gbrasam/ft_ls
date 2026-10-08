@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:43:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 14:50:45 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/08 15:40:38 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ void	init_ctx(t_ctx *ctx, const char *prog)
 {
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->prog = prog;
+	ctx->invalid = NULL;
 	ctx->fatal = FATAL_NONE;
 }
 

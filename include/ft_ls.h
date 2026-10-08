@@ -6,15 +6,16 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 14:50:38 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/08 16:19:36 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef FT_LS_H
 #define FT_LS_H
 
-#include <string.h>			/* memset */
+#include <string.h>
 #include <stdio.h>
+#include <stdlib.h>			
 #include <time.h>
 
 /**
@@ -94,8 +95,10 @@ typedef enum e_fatal
  *
  * opts     qué opciones están activadas
  * *prog    nombre del programa, prefijo de los mensajes de error
- * invalid_option no puede ser const porque en parse_option se modifica
- *               ctx->invalid_option = arg[i]
+ * invalid  apunta a la información de una opción no admitida:
+ *          - opción corta: apunta al carácter inválido
+ *          - opción larga: apunta al argumento completo
+ *          No modifica la cadena original ni reserva memoria.
  * status   código con el que terminará el programa (0, 1 o 2)
  *			0 = ejecución correcta, sin errores
  *			1 = error general de ejecución
@@ -118,7 +121,8 @@ typedef struct s_ctx
 {
 	t_opts			opts;
 	const char		*prog;
-	char			invalid_option;
+	const char		*invalid;
+	t_argkind		invalid_kind;
 	int				status;
 	int				printed;
 	int				headers;
