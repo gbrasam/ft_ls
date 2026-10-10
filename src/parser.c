@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:22:41 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 16:25:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/10 10:40:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -82,6 +82,8 @@ static int	parse_option(t_ctx *ctx, const char *arg)
 		{
 			case 'l':
 				ctx->opts.l = 1;
+
+				q
 				break ;
 			case 'R':
 				ctx->opts.big_r = 1;
@@ -105,8 +107,15 @@ static int	parse_option(t_ctx *ctx, const char *arg)
 }	
 
 /**
- * actúa según el tipo de argumento dado por classify_arg
- * 
+ * scan_args() recorre argv, clasifica los argumentos mediante
+ * classify_arg(), valida las opciones y cuenta los operandos.
+ *
+ * Conocido el número de operandos, parse_args() podrá reservar
+ * únicamente la memoria necesaria.
+ *
+ * store_operands() realizará una segunda pasada para guardar
+ * los operandos en el orden en que aparecen en argv.
+ *
  * int *operand_count
  * Contador temporal utilizado durante la primera pasada para averiguar
  * cuántos operandos ha escrito el usuario.
@@ -172,6 +181,29 @@ static int	scan_args(int argc, char **argv, t_ctx *ctx, int *operand_count)
 		i++;
 	}
 	return (0);
+}
+
+static void	store_operand(int argc, char **argv, t_operands *ops)
+{
+	int			i;
+	int			end_opts;
+	t_argkind	arg_kind;
+
+	i = 1;
+	end_opts = 0;
+	while (i < argc)
+	{
+		arg_kind = classify_arg(argv[i], end_opts);
+		if (arg_kind == ARG_END_OPTIONS)
+			end_opts = 1;
+		else if (arg_kind == ARG_OPERAND)
+		{
+			ops->items[ops->count] = argv[i];
+			ops->count++;
+		}
+		i++;
+	}
+	ops->items[ops->count] = NULL;
 }
 
 /**
