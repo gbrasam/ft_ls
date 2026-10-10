@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:08:11 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 16:25:08 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/10 11:10:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,7 @@
  */
 void	report_fatal(t_ctx *ctx)
 {
-	if (ctx->fatal = FATAL_NONE)
+	if (ctx->fatal == FATAL_NONE)
 		return ;
 	
 	ctx->status = 2;
