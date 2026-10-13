@@ -6,16 +6,16 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/10 10:40:10 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/11 09:10:43 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef FT_LS_H
 #define FT_LS_H
 
-#include <string.h>
 #include <stdio.h>
-#include <stdlib.h>			
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 /**

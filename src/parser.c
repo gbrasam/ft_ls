@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:22:41 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/10 10:40:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/13 17:40:48 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -82,8 +82,6 @@ static int	parse_option(t_ctx *ctx, const char *arg)
 		{
 			case 'l':
 				ctx->opts.l = 1;
-
-				q
 				break ;
 			case 'R':
 				ctx->opts.big_r = 1;
@@ -183,7 +181,7 @@ static int	scan_args(int argc, char **argv, t_ctx *ctx, int *operand_count)
 	return (0);
 }
 
-static void	store_operand(int argc, char **argv, t_operands *ops)
+static void	store_operands(int argc, char **argv, t_operands *ops)
 {
 	int			i;
 	int			end_opts;
@@ -286,6 +284,6 @@ int	parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops)
 		ctx->fatal = FATAL_NOMEM;
 		return (-1);
 	}
-	store_operand(argc, argv, ops);
+	store_operands(argc, argv, ops);
 	return (0);
 }
