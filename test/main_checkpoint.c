@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/11 09:21:08 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/14 11:35:38 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/14 12:08:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,14 @@
 	src/init.c \
 	-o test/checkpoint
  * ./test/checkpoint
+ *
+ * ./ft_ls -lz > /tmp/ft_test/ft.out 2> /tmp/ft_test/ft.err; echo $? > /tmp/ft_test/ft.code
+ * LC_ALL=C ls -lz > /tmp/ft_test/ls.out 2> /tmp/ft_test/ls.err; echo $? > /tmp/ft_test/ls.code
+ *
+ * diff /tmp/ft_test/ls.err <(sed 's|\./ft_ls|ls|g' /tmp/ft_test/ft.err)
+ * diff /tmp/ft_test/ls.out /tmp/ft_test/ft.out
+ * diff /tmp/ft_test/ls.code /tmp/ft_test/ft.code
+ *
  * main(): recorre todos los casos de g_parse_cases
  *		   hasta encontrar el centinela {.id = NULL}
  *		   acumula esos resultados de la función run_case() en failed
