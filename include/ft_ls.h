@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/11 09:10:43 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/14 16:35:59 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,6 +66,13 @@ typedef enum e_argkind
 	ARG_OPERAND,
 	ARG_END_OPTIONS
 }	t_argkind;
+
+typedef enum e_operand_kind
+{
+	OPS_FILE,
+	OPS_DIRECTORY,
+	OPS_ERROR
+}	t_operand_kind;
 
 /**
  * t_fatal representa los errores que obligan a detener el procesamiento.
@@ -129,7 +136,14 @@ typedef struct s_ctx
 	t_fatal			fatal;
 	struct timespec	now;
 
-} t_ctx;
+}	t_ctx;
+
+typedef struct s_operand_info
+{
+	const char		*name;
+	t_operand_kind	kind;
+	int				err;	/* errno */
+}	t_operand_info;
 
 /**
  * Guardar los operandos en su orden
@@ -150,14 +164,24 @@ typedef struct s_operands
 {
 	char	**items;
 	int		count;
-} t_operands;
+}	t_operands;
+
+typedef struct s_operand_list
+{
+	t_operand_info	*items;
+	int				count;
+}	t_operand_list;
 
 /* init.c */
 void	init_ctx(t_ctx *ctx, const char *prog);
 void	init_ops(t_operands *ops);
+void	init_operand_list(t_operand_list *operand_list);
 
 /* parser.c */
 int		parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops);
+
+/* run.c */
+void	run_ls(t_ctx *ctx, t_operands *ops);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);

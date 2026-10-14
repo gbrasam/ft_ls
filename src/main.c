@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:21:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/08 14:50:40 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/14 16:50:55 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,13 +18,9 @@ int	main(int argc, char **argv)
 	t_operands	ops;
 
 	init_ctx(&ctx, argv[0]);
-	if (parse_args(argc, argv, &ctx, &ops) == -1)
-	{
-		report_fatal(&ctx);
-		clean_all(&ctx, &ops);
-		return (ctx.status);
-	}
-	/* ... */
+	if (parse_args(argc, argv, &ctx, &ops) == 0)
+		run_ls(&ctx, &ops);
+	report_fatal(&ctx);
 	clean_all(&ctx, &ops);
 	return (ctx.status);
 }
