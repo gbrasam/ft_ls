@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/14 16:35:59 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/15 16:15:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,32 +16,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include <time.h>
-
-/**
- * t_opts agrupa el estado de las opciones (flags) obligatorias
- * del subject (Chapter V Mandatory Part).
- *
- * 1 = opción activada
- * 0 = opción desactivada
- *
- * Por ejemplo, al ejecutar:
- * ./ft_ls -la
- *
- * l     = 1
- * a     = 1
- * big_r = 0
- * r     = 0
- * t     = 0
- */
-typedef struct s_opts
-{
-	int	l;
-	int	big_r;				/* -R */
-	int	a;
-	int	r;
-	int	t;
-}	t_opts;
 
 /**
  * t_argkind representa la clase de argumento de la línea de comandos.
@@ -98,6 +75,31 @@ typedef enum e_fatal
 }	t_fatal;
 
 /**
+ * t_opts agrupa el estado de las opciones (flags) obligatorias
+ * del subject (Chapter V Mandatory Part).
+ *
+ * 1 = opción activada
+ * 0 = opción desactivada
+ *
+ * Por ejemplo, al ejecutar:
+ * ./ft_ls -la
+ *
+ * l     = 1
+ * a     = 1
+ * big_r = 0
+ * r     = 0
+ * t     = 0
+ */
+typedef struct s_opts
+{
+	int	l;
+	int	big_r;							/* -R */
+	int	a;
+	int	r;
+	int	t;
+}	t_opts;
+
+/**
  * Contexto de la ejecución.
  *
  * opts     qué opciones están activadas
@@ -142,7 +144,7 @@ typedef struct s_operand_info
 {
 	const char		*name;
 	t_operand_kind	kind;
-	int				err;	/* errno */
+	int				err;			/* errno */
 }	t_operand_info;
 
 /**
@@ -172,6 +174,7 @@ typedef struct s_operand_list
 	int				count;
 }	t_operand_list;
 
+
 /* init.c */
 void	init_ctx(t_ctx *ctx, const char *prog);
 void	init_ops(t_operands *ops);
@@ -182,6 +185,9 @@ int		parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops);
 
 /* run.c */
 void	run_ls(t_ctx *ctx, t_operands *ops);
+
+/* operands.c */
+void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);

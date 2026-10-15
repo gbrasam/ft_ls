@@ -6,36 +6,54 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/14 13:21:21 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/14 16:50:50 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/15 16:15:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
 /*
- * Consulta el tipo de objeto al que corresponde una ruta.
+ * Consulta los metadatos de una ruta y clasifica el operando
+ * → consulta stat() y devuelve tipo/error
  *
- * - Si la consulta falla:
- *     Guarda errno en *error y devuelve OPS_ERROR.
- * - Si es un directorio:
- *     Devuelve OPS_DIRECTORY.
- * - En cualquier otro caso:
- *     Devuelve OPS_FILE.
+ * Utiliza stat(), que sigue los enlaces simbólicos y consulta
+ * los metadatos del objeto al que apuntan
  *
- * Utiliza stat() o lstat() según el tratamiento de enlaces simbólicos.
- * stat() sigue el enlace; lstat() examina el propio enlace.
+ * stat(const char *path, struct stat *buf):
+ * - path: ruta que se quiere consultar
+ * - buf: puntero a la estructura donde se guardan los metadatos
+ * - Devuelve 0 si tiene éxito y -1 si falla (establece errno)
+ *
+ * struct stat st:
+ * - st es la variable local que recibe los metadatos
+ * - st.st_mode contiene el tipo de archivo y sus permisos
+ * - S_ISDIR(st.st_mode) devuelve un valor distinto de 0
+ *   si es un directorio, y 0 en caso contrario
+ *
+ * Resultado:
+ * - OPS_ERROR: stat() falla; guarda errno en *error
+ * - OPS_DIRECTORY: el objeto es un directorio
+ * - OPS_FILE: cualquier otro tipo de objeto válido
  *
  * No imprime errores ni modifica ctx->status.
  */
 static t_operand_kind	get_operand_kind(const char *name, int *error)
 {
-	/*la recomendación de copiar errno inmediatamente
-	después de detectar el fallo es correcta y está bien fundamentada.*/
+	struct stat st;
 
+	if (stat(name, &st) == -1)
+	{
+		*error = errno;
+		return (OPS_ERROR);	
+	}
+	if (S_ISDIR(st.st_mode) != 0)
+		return (OPS_DIRECTORY);
+	return (OPS_FILE);
 }
 
 /*
- * Clasifica todos los operandos recibidos por parse_args().
+ * Clasifica todos los operandos recibidos por parse_args()
+ * → guarda los resultados de todos los operandos
  *
  * La memoria de operand_list->items ya está reservada por run_ls().
  *
@@ -120,8 +138,8 @@ void	run_ls(t_ctx *ctx, t_operands *ops)
 	init_operand_list(&operand_list);
 	count = ops->count;
 	if (count == 0)
-		count = 1;	/* necesitamos reservar espacio para un operando implícito: "." */
-	operand_list.items = malloc(sizeof(t_operand_info) * count);
+		count = 1;															/* necesitamos reservar espacio para un operando implícito: "." */
+	operand_list.items = malloc(sizeof(t_operand_info) * count);			/* ¡! array de estructuras, NO de caracteres; reservamos 'count' estructuras */
 	if (!operand_list.items)
 	{
 		ctx->fatal = FATAL_NOMEM;
@@ -129,7 +147,7 @@ void	run_ls(t_ctx *ctx, t_operands *ops)
 	}
 	operand_list.count = count;
 	classify_operands(ctx, ops, &operand_list);
-	/* read_directory() */
+	handle_operands(ctx, &operand_list);
 	free(operand_list.items); 
 	/* Cuando run_ls() tenga otras operaciones después de classify_operands(),
 	alguna podría producir un error fatal.
