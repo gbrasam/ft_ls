@@ -6,7 +6,7 @@
 #    By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/10/02 11:41:25 by gebravo           #+#    #+#              #
-#    Updated: 2026/10/15 16:45:18 by gebravo          ###   ########.fr        #
+#    Updated: 2026/10/16 12:10:25 by gebravo          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -24,6 +24,7 @@ SRCS		= $(SRC_DIR)/main.c \
 			  $(SRC_DIR)/parser.c \
 			  $(SRC_DIR)/run.c \
 			  $(SRC_DIR)/operands.c \
+			  $(SRC_DIR)/directory.c \
 			  $(SRC_DIR)/sort.c \
 			  $(SRC_DIR)/error.c \
 			  $(SRC_DIR)/clean.c

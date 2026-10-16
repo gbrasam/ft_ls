@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/15 16:45:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/16 12:15:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,10 +45,7 @@ static void	handle_non_directories(t_ctx *ctx, t_operand_list *operand_list)
 
 static void	handle_directory(t_ctx *ctx, t_operand_info *operand)
 {
-	(void)ctx;
-	(void)operand;
-	/* TODO abrir, leer, filtrar, ordenar y mostrar entradas */
-	/* opendir(), readdir(), closedir() #include <dirent.h> */
+	list_directory(ctx, operand);
 }
 
 static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)

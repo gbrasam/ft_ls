@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/15 16:15:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/16 12:15:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -188,6 +188,12 @@ void	run_ls(t_ctx *ctx, t_operands *ops);
 
 /* operands.c */
 void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
+
+/* directory.c */
+void	list_directory(t_ctx *ctx, t_operand_info *operand);
+
+/* sort.c */
+void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);
