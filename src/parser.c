@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:22:41 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/19 17:15:41 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:18:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -114,7 +114,7 @@ static int	parse_option(t_ctx *ctx, const char *arg)
  * store_operands() realizará una segunda pasada para guardar
  * los operandos en el orden en que aparecen en argv.
  *
- * int *operand_count
+ * size_t *operand_count
  * Contador temporal utilizado durante la primera pasada para averiguar
  * cuántos operandos ha escrito el usuario.
  * Lo necesitamos principalmente para saber cuánta memoria reservar.
