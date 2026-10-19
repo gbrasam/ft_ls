@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/16 12:15:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:10:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <dirent.h>
+#include <stdint.h>
 #include <time.h>
 
 /**
@@ -54,10 +56,10 @@ typedef enum e_operand_kind
 /**
  * t_fatal representa los errores que obligan a detener el procesamiento.
  *
- * FATAL_NONE   (=0) -> no hay error fatal.
- * FATAL_OPTION (=1) -> opción de línea de comandos no válida.
- * FATAL_NOMEM  (=2) -> fallo al reservar memoria dinámica.
- * FATAL_WRITE  (=3) -> fallo al escribir la salida.
+ * FATAL_NONE   (=0) -> no hay error fatal
+ * FATAL_OPTION (=1) -> opción de línea de comandos no válida
+ * FATAL_NOMEM  (=2) -> fallo al reservar memoria dinámica
+ * FATAL_WRITE  (=3) -> fallo al escribir la salida
  *
  * IMPORTANTE: un error recuperable no significa que el error pueda
  * solucionarse. Significa que el error ha ocurrido, pero el programa
@@ -93,7 +95,7 @@ typedef enum e_fatal
 typedef struct s_opts
 {
 	int	l;
-	int	big_r;							/* -R */
+	int	big_r;									/* -R */
 	int	a;
 	int	r;
 	int	t;
@@ -110,8 +112,8 @@ typedef struct s_opts
  *          No modifica la cadena original ni reserva memoria.
  * status   código con el que terminará el programa (0, 1 o 2)
  *			0 = ejecución correcta, sin errores
- *			1 = error general de ejecución
- *			2 = error grave o de uso, por ejemplo una opción no válida
+ *			1 = problema menor, p. ej. no poder acceder a un subdirectorio con -R
+ *			2 = problema grave: opción no válida, operando de argv inaccesible, sin memoria
  * printed  indica si ya hemos impreso algo anteriormente
  * headers  indica si debemos imprimir el nombre del directorio como cabecera
  * fatal    indica si ha ocurrido un error que obliga a detenerse
@@ -144,8 +146,14 @@ typedef struct s_operand_info
 {
 	const char		*name;
 	t_operand_kind	kind;
-	int				err;			/* errno */
+	int				err;						/* errno */
 }	t_operand_info;
+
+typedef struct s_operand_list
+{
+	t_operand_info	*items;
+	size_t			count;
+}	t_operand_list;
 
 /**
  * Guardar los operandos en su orden
@@ -165,20 +173,53 @@ typedef struct s_operand_info
 typedef struct s_operands
 {
 	char	**items;
-	int		count;
+	size_t	count;
 }	t_operands;
 
-typedef struct s_operand_list
+/*
+ * st: estructura donde se almacenan los metadatos del archivo
+ * st_mode		tipo de archivo y permisos
+ * st_size		tamaño en bytes
+ * st_mtim		fecha y hora de última modificación, en Linux
+ * st_uid		identificador del propietario
+ * st_gid		identificador del grupo
+ * st_nlink		número de enlaces duros
+ * st_blocks	bloques de 512 bytes asignados
+ * 
+ * esta información será necesaria para implementar las opciones
+ * -l: necesita permisos, propietario, grupo, tamaño, fecha, etc
+ * -t: necesita la fecha de modificación para ordenar
+ * -R: usa S_ISDIR(st.st_mode) de la entrada para decidir si desciende
+ *
+ * rellenamos st mediante lstat()
+ * lstat(path, &entry->st); path = build_path(directorio, entry->name), p. ej. "src/clean.c"
+ * si lstat() tiene éxito, devuelve 0
+ * si falla, devuelve -1 y establece errno
+ * 
+ * stat_ok: ¿hemos obtenido correctamente los metadatos?
+ * flag stat_ok = 1: lstat() ha tenido éxito y st contiene datos válidos
+ * flag stat_ok = 0: todavía no se han solicitado los metadatos o lstat() ha fallado
+ */
+typedef struct s_directory_entry
 {
-	t_operand_info	*items;
-	int				count;
-}	t_operand_list;
+	char		*name;
+	struct stat	st;
+	int			stat_ok;						/* 1: st válido; 0: lstat() no llamado o fallido */
+}	t_directory_entry;
+
+typedef struct s_directory_list
+{
+	t_directory_entry	*items;
+	size_t				count;      			/* entradas almacenadas */
+	size_t				capacity;   			/* espacio reservado, en número de entradas */
+}	t_directory_list;
 
 
 /* init.c */
 void	init_ctx(t_ctx *ctx, const char *prog);
 void	init_ops(t_operands *ops);
 void	init_operand_list(t_operand_list *operand_list);
+void	init_directory_list(t_directory_list *list);
 
 /* parser.c */
 int		parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops);
@@ -199,6 +240,8 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 void	report_fatal(t_ctx *ctx);
 
 /* clean.c */
+
 void	clean_all(t_ctx *ctx, t_operands *ops);
+void	clean_directory_list(t_directory_list *list);
 
 #endif

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/16 12:15:08 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:10:28 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,7 +30,7 @@ static void	handle_file(t_ctx *ctx, t_operand_info *operand)
 
 static void	handle_non_directories(t_ctx *ctx, t_operand_list *operand_list)
 {
-	int	i;
+	size_t	i;
 
 	i = 0;
 	while (i < operand_list->count)
@@ -50,10 +50,10 @@ static void	handle_directory(t_ctx *ctx, t_operand_info *operand)
 
 static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 {
-	int	i;
+	size_t	i;
 
 	i = 0;
-	while (i < operand_list->count)
+	while (i < operand_list->count && ctx->fatal == FATAL_NONE)
 	{
 		if (operand_list->items[i].kind == OPS_DIRECTORY)
 			handle_directory(ctx, &operand_list->items[i]);
@@ -68,7 +68,13 @@ static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
  */
 void	handle_operands(t_ctx *ctx, t_operand_list *operand_list)
 {
+	if (ctx->fatal != FATAL_NONE)
+		return ;
 	sort_operands(ctx, operand_list);
+	if (ctx->fatal != FATAL_NONE)
+		return ;
 	handle_non_directories(ctx, operand_list);
+	if (ctx->fatal != FATAL_NONE)
+		return ;
 	handle_directories(ctx, operand_list);
 }

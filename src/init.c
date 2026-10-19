@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:43:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/14 16:50:58 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:10:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,4 +55,11 @@ void	init_operand_list(t_operand_list *operand_list)
 {
 	operand_list->items = NULL;
 	operand_list->count = 0;
+}
+
+void	init_directory_list(t_directory_list *list)
+{
+	list->items = NULL;
+	list->count = 0;
+	list->capacity = 0;
 }

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/14 13:21:21 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/15 16:15:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:10:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,7 +71,7 @@ static t_operand_kind	get_operand_kind(const char *name, int *error)
  */
 static void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list)
 {
-	int	i;
+	size_t	i;
 
 	(void)ctx;
 	i = 0;
@@ -88,52 +88,42 @@ static void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *opera
 }
 
 /*
- * Coordina la ejecución del listado según las opciones y operandos.
+ * Coordina la ejecución del listado según las opciones y operandos
  *
  * 1. PREPARAR Y CLASIFICAR OPERANDOS
- *    - Inicializar operand_list.
- *    - Reservar memoria para todos los operandos.
- *    - Si no hay operandos, reservar una entrada para ".".
- *    - Clasificar todas las rutas antes de procesarlas.
+ *    - Inicializar operand_list
+ *    - Reservar memoria para todos los operandos
+ *    - Si no hay operandos, reservar una entrada para "."
+ *    - Clasificar todas las rutas antes de procesarlas
  *
  * 2. PROCESAR OPERANDOS
- *    - Informar de los operandos con error.
- *    - Mostrar los archivos y otros objetos no directorio.
- *    - Recorrer y mostrar los directorios.
+ *    - Informar de los operandos con error
+ *    - Mostrar los archivos y otros objetos no directorio
+ *    - Recorrer y mostrar los directorios
  *
- * 3. LEER DIRECTORIOS
- *    - Abrir con opendir().
- *    - Leer entradas con readdir().
- *    - Aplicar el filtro de ocultos según -a.
- *    - Cerrar con closedir().
- *    - Ordenar y mostrar las entradas.
- *
- *    Antes de cada readdir(), establecer errno = 0.
- *    Si devuelve NULL:
- *      errno == 0: fin del directorio.
- *      errno != 0: error de lectura.
+ * 3. LISTAR DIRECTORIOS: delegado en handle_operands() -> list_directory() (directory.c)
  *
  * 4. CONTROLAR LA PRESENTACIÓN
- *    - Aplicar las opciones -l, -R, -a, -r y -t.
- *    - Gestionar cabeceras y separadores entre bloques.
- *    - Mostrar los archivos antes de los directorios.
+ *    - Aplicar las opciones -l, -R, -a, -r y -t
+ *    - Gestionar cabeceras y separadores entre bloques
+ *    - Mostrar los archivos antes de los directorios
  *
  * 5. GESTIONAR ERRORES Y MEMORIA
- *    - Registrar los errores recuperables en ctx->status.
- *    - Registrar los errores fatales en ctx->fatal.
- *    - Ante un error fatal, detener el procesamiento.
- *    - Liberar siempre los recursos locales reservados.
+ *    - Registrar los errores recuperables en ctx->status
+ *    - Registrar los errores fatales en ctx->fatal
+ *    - Ante un error fatal, detener el procesamiento
+ *    - Liberar siempre los recursos locales reservados
  *
  *    main() llama a report_fatal(), que informa del error
- *    fatal y establece ctx->status = 2.
+ *    fatal y establece ctx->status = 2
  *
- * No realiza el parseo de argumentos.
- * No imprime directamente los errores fatales.
+ * No realiza el parseo de argumentos
+ * No imprime directamente los errores fatales
  */
 void	run_ls(t_ctx *ctx, t_operands *ops)
 {
 	t_operand_list	operand_list;
-	int				count;
+	size_t			count;
 
 	init_operand_list(&operand_list);
 	count = ops->count;
@@ -148,8 +138,6 @@ void	run_ls(t_ctx *ctx, t_operands *ops)
 	operand_list.count = count;
 	classify_operands(ctx, ops, &operand_list);
 	handle_operands(ctx, &operand_list);
-	free(operand_list.items); 
-	/* Cuando run_ls() tenga otras operaciones después de classify_operands(),
-	alguna podría producir un error fatal.
-	En ese caso, no debes hacer un return que se salte este free  */
+	/* handle_operands() puede producir un error fatal: no añadir ningún return entre malloc() y este free() */
+	free(operand_list.items);
 }

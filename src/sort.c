@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:37:54 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/16 12:15:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:10:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,8 +24,8 @@ static int	compare_name(const char *a, const char *b)
 
 static void	sort_by_kind(t_operand_list *operand_list, t_operand_kind kind)
 {
-	int				i;
-	int 			j;
+	size_t			i;
+	size_t			j;
 	t_operand_info	tmp;
 
 	i = 0;
@@ -55,11 +55,13 @@ static void	sort_by_kind(t_operand_list *operand_list, t_operand_kind kind)
 
 /*
  * sort_operands():
- * - Recibe los operandos y las opciones mediante ctx.
- * - Ordena OPS_FILE y OPS_DIRECTORY por separado.
- * - Excluye OPS_ERROR de la ordenación.
- * - Aplica el criterio: nombre o fecha (-t).
- * - Invierte el orden si está activada -r.
+ * - Recibe los operandos y las opciones mediante ctx
+ * - Ordena OPS_FILE y OPS_DIRECTORY por separado
+ * - Excluye OPS_ERROR de la ordenación
+ * - Aplica el criterio: nombre o fecha (-t)
+ * - Invierte el orden si está activada -r
+ *
+ * Con LC_ALL=C, strcmp() reproduce el orden de ls
  */
 void	sort_operands(t_ctx *ctx, t_operand_list *operand_list)
 {
@@ -68,9 +70,8 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list)
 	sort_by_kind(operand_list, OPS_DIRECTORY);
 	/*TODO
 	Para completar la ordenación:
-	1. -r: invertir el orden.
-	2. -t: ordenar por fecha de modificación.
-	3. Resolver empates de fecha.
-	4. Revisar strcmp() frente a strcoll() para reproducir el orden de GNU ls.
+	1. -r: invertir el orden
+	2. -t: ordenar por fecha de modificación
+	3. Resolver empates de fecha
 	*/
 }
