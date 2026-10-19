@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:22:41 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/14 11:51:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/19 17:15:41 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -145,7 +145,7 @@ static int	parse_option(t_ctx *ctx, const char *arg)
  * ARG_SHORT       → procesar la opción (-a, -l, etc.)
  * ARG_LONG        → registrar error
  */
-static int	scan_args(int argc, char **argv, t_ctx *ctx, int *operand_count)
+static int	scan_args(int argc, char **argv, t_ctx *ctx, size_t *operand_count)
 {
 	int			i;
 	int			end_opts;
@@ -270,7 +270,7 @@ static void	store_operands(int argc, char **argv, t_operands *ops)
  */
 int	parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops)
 {
-	int	operand_count;
+	size_t	operand_count;
 
 	operand_count = 0;
 	init_ops(ops);
