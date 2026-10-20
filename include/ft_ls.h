@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/19 17:10:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/20 12:15:53 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -227,7 +227,10 @@ int		parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops);
 /* run.c */
 void	run_ls(t_ctx *ctx, t_operands *ops);
 
-/* operands.c */
+/* operands_classify.c */
+void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list);
+
+/* operands_handle.c */
 void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* directory.c */

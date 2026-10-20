@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:22:41 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/19 17:18:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/20 10:35:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -205,6 +205,10 @@ static void	store_operands(int argc, char **argv, t_operands *ops)
 }
 
 /**
+ * parser.c tiene dos responsabilidades estrechamente relacionadas:
+ * 1) interpretar los argumentos de la línea de comandos
+ * 2) guardar el resultado de esa interpretación
+ * 
  * Reglas principales del parser:
  *
  * [SUBJECT] Opciones obligatorias de ft_ls: -l, -R, -a, -r y -t.
