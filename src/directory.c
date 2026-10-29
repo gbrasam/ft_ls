@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/29 13:10:59 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/29 17:25:10 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -107,42 +107,46 @@ static void	print_entries(const t_directory_list *list)
 }
 
 /**
- * LIST_DIRECTORY — Abrir y leer el contenido de un directorio
+ * LIST_DIRECTORY — Abrir, leer y procesar el contenido de un directorio
  *
  * 1. ABRIR EL DIRECTORIO: opendir()
  *
  *    #include <dirent.h>
  *    DIR *opendir(const char *name);
  *
- *    - name: ruta del directorio que queremos abrir
- *      En nuestro caso: path
+ *    - name: ruta del directorio que queremos abrir.
+ *      En nuestro caso: path.
  *
- *    - DIR *: puntero al objeto que gestiona la lectura del directorio
+ *    - DIR *: puntero al objeto que gestiona la lectura del directorio.
  *      Lo guardamos en una variable:
  *
  *          DIR *dir;
  *          dir = opendir(path);
  *
- *    - Si tiene éxito, devuelve un puntero DIR *
- *    - Si falla, devuelve NULL y establece errno
- *      Ejemplos: directorio inexistente o permisos insuficientes
+ *    - Si tiene éxito, devuelve un puntero DIR *.
+ *    - Si falla, devuelve NULL y establece errno.
+ *      Ejemplos: directorio inexistente o permisos insuficientes.
  *
  *    IMPORTANTE:
- *    opendir() NO devuelve los nombres de los archivos
- *    Solo abre el directorio y prepara su lectura
+ *    opendir() NO devuelve los nombres de los archivos.
+ *    Solo abre el directorio y prepara su lectura.
  *
  *    Diferencia:
- *    path -> cadena con la ruta del directorio
- *    dir           -> puntero para leer ese directorio
+ *    - path: cadena con la ruta del directorio.
+ *    - dir: puntero que permite leer ese directorio.
+ *
+ *    En nuestro programa, la apertura se realiza mediante
+ *    open_directory(), que también gestiona los errores.
  *
  *
  * 2. LEER LAS ENTRADAS: readdir()
  *
+ *    #include <dirent.h>
  *    struct dirent *readdir(DIR *dirp);
  *
- *    - dirp: puntero DIR * obtenido con opendir()
- *    - Devuelve un puntero struct dirent * a la siguiente entrada
- *    - Devuelve NULL cuando no quedan entradas o hay un error
+ *    - dirp: puntero DIR * obtenido mediante opendir().
+ *    - Devuelve un puntero struct dirent * a la siguiente entrada.
+ *    - Devuelve NULL cuando no quedan entradas o hay un error.
  *
  *    Para guardar el resultado:
  *
@@ -154,56 +158,159 @@ static void	print_entries(const t_directory_list *list)
  *        entry->d_name
  *
  *    IMPORTANTE:
- *    Comprobar que entry != NULL antes de acceder a d_name
+ *    Comprobar que entry != NULL antes de acceder a d_name.
  *
- *    Un directorio puede contener muchas entradas
- *    Debemos llamar repetidamente a readdir() hasta recibir NULL
+ *    Un directorio puede contener muchas entradas.
+ *    Debemos llamar repetidamente a readdir() hasta recibir NULL.
  *
  *    Para distinguir fin de lectura de error:
- *    - errno == 0: fin del directorio
- *    - errno != 0: error de lectura
+ *    - errno == 0: fin del directorio.
+ *    - errno != 0: error de lectura.
  *
- *    Debemos poner errno = 0 antes de la llamada cuyo
- *    resultado NULL vamos a comprobar
+ *    Debemos poner errno = 0 antes de la llamada a readdir()
+ *    cuyo resultado NULL vamos a comprobar.
  *
  *    ATENCIÓN:
  *    Guardar entry NO significa conservar todas las entradas.
  *    readdir() puede reutilizar su memoria en llamadas posteriores.
- *    Para conservar nombres, necesitaremos copiarlos y almacenarlos
- *    en una colección propia -> "t_directory_list	list;"
+ *
+ *    Para conservar los nombres, debemos copiarlos mediante
+ *    strdup() y almacenarlos en una colección propia:
+ *
+ *        t_directory_list list;
+ *
+ *    En nuestro programa, read_directory() realiza la lectura
+ *    y utiliza store_entry() para almacenar cada entrada.
  *
  *
- * 3. PROCESAMIENTO DE LAS ENTRADAS
+ * 3. PROCESAR Y ALMACENAR LAS ENTRADAS
  *
  *    IMPLEMENTADO:
- *    - Almacenar las entradas en t_directory_list mediante store_entry()
+ *    - Filtrar nombres ocultos según la opción -a.
+ *    - Almacenar las entradas en t_directory_list mediante
+ *      store_entry().
+ *    - Copiar los nombres con strdup(), porque la memoria
+ *      devuelta por readdir() no debe conservarse directamente.
  *    - Obtener metadatos mediante store_entry() -> load_stat(),
- *      solo cuando están activadas las opciones -l, -t o -R
+ *      cuando están activadas las opciones -l, -t o -R.
+ *    - Guardar los metadatos en cada t_directory_entry.
+ *    - Utilizar stat_ok para indicar si son válidos.
  *
  *    PENDIENTE:
- *    - Ordenar por nombre o fecha (-t), considerando -r
- *    - Mostrar las entradas (formato normal o -l)
- *    - Descender a subdirectorios si está activado -R
+ *    - ETAPA 4: ordenar las entradas por nombre o fecha (-t),
+ *      considerando también la opción -r.
+ *    - ETAPA 5: implementar la presentación detallada con -l.
+ *    - ETAPA 7: descender a subdirectorios cuando se active -R.
  *
  *    IMPORTANTE PARA -R:
- *    Primero procesamos y mostramos el directorio actual
- *    Después descendemos a sus subdirectorios
- *    Nunca debemos descender a "." ni a ".."
+ *    Primero procesamos y mostramos el directorio actual.
+ *    Después descendemos a sus subdirectorios.
  *
- * 4. CERRAR Y LIBERAR RECURSOS
+ *    Nunca debemos descender a "." ni a "..".
  *
+ *    Los metadatos obtenidos mediante lstat() permiten
+ *    distinguir un directorio real de un enlace simbólico
+ *    que apunta a un directorio.
+ *
+ *
+ * 4. CERRAR EL DIRECTORIO: closedir()
+ *
+ *    #include <dirent.h>
  *    int closedir(DIR *dirp);
  *
- *    - Cierra el directorio abierto con opendir()
- *    - Devuelve 0 si tiene éxito y -1 si falla (establece errno)
- *    - Las entradas se liberan con clean_directory_list() antes de closedir()
+ *    - Cierra el directorio abierto mediante opendir().
+ *    - Devuelve 0 si tiene éxito y -1 si falla (establece errno).
+ *    - Después de cerrarlo, no debemos volver a utilizar dir.
  *
- *    Un fallo de apertura o lectura suele ser recuperable:
- *    informar por stderr, actualizar ctx->status y continuar
- *    con otros directorios cuando sea posible
+ *    ORDEN ACTUAL:
+ *
+ *    1. open_directory()       -> abrir el directorio.
+ *    2. init_directory_list()  -> inicializar la lista.
+ *    3. read_directory()       -> leer y almacenar entradas.
+ *    4. closedir()             -> cerrar el directorio.
+ *    5. sort_directory_entries() -> ordenar las entradas.
+ *    6. print_entries()        -> imprimir las entradas.
+ *    7. Recursividad -R        -> pendiente.
+ *    8. clean_directory_list() -> liberar la memoria.
+ *
+ *    IMPORTANTE:
+ *    Cerramos el directorio ANTES de ordenar e imprimir.
+ *
+ *    Esto es posible porque ya hemos copiado los nombres
+ *    y, cuando es necesario, los metadatos de las entradas.
+ *
+ *    Con -R evitaremos mantener abiertos simultáneamente
+ *    los directorios de los distintos niveles del recorrido.
+ *
+ *    closedir() también debe ejecutarse cuando read_directory()
+ *    falla, siempre que opendir() haya funcionado.
  *
  *
- *	ctx->status = 2; error recuperable -> el programa informa del error, pero puede seguir procesando otros directorios
+ * 5. LIBERAR LA MEMORIA: clean_directory_list()
+ *
+ *    Después de procesar las entradas, liberamos la memoria
+ *    reservada para nuestra lista.
+ *
+ *    clean_directory_list() debe liberar:
+ *    - Cada nombre copiado mediante strdup().
+ *    - El array dinámico de t_directory_entry.
+ *
+ *    No debemos confundir dos recursos diferentes:
+ *
+ *    - DIR *dir:
+ *      Recurso gestionado mediante opendir() y closedir().
+ *
+ *    - t_directory_list list:
+ *      Memoria dinámica gestionada mediante store_entry()
+ *      y clean_directory_list().
+ *
+ *    Cerrar dir NO libera automáticamente nuestra lista.
+ *    Liberar la lista NO cierra el directorio.
+ *
+ *    Si open_directory() falla, no se ha inicializado la lista
+ *    y la función retorna directamente.
+ *
+ *    Si read_directory() falla después de inicializarla,
+ *    debemos cerrar dir y liberar la memoria almacenada.
+ *
+ *
+ * 6. TRATAMIENTO DE ERRORES
+ *
+ *    ctx->status:
+ *    Representa el código de salida global del programa.
+ *
+ *    - 0: sin errores.
+ *    - 1: errores menores durante el procesamiento.
+ *    - 2: errores de mayor gravedad.
+ *
+ *    Un error recuperable no implica necesariamente
+ *    detener el programa: podemos informar por stderr
+ *    y continuar con otros operandos o directorios.
+ *
+ *    ctx->fatal:
+ *    Indica si se ha producido un error que impide
+ *    continuar con el procesamiento normal.
+ *
+ *    Por ejemplo:
+ *    - FATAL_NOMEM: fallo de reserva de memoria.
+ *
+ *    IMPORTANTE:
+ *    ctx->status y ctx->fatal tienen responsabilidades
+ *    diferentes y no deben confundirse.
+ *
+ *    PENDIENTE ETAPA 7 (-R):
+ *    Distinguir los errores de directorios recibidos como
+ *    operandos de argv de los errores de subdirectorios
+ *    descubiertos durante el recorrido recursivo.
+ *
+ *    PENDIENTE ETAPA 8:
+ *    - Distinguir un fallo recuperable de readdir()
+ *      de un fallo fatal de memoria.
+ *    - Aprovechar ctx->fatal para identificar el fallo
+ *      de memoria sin añadir otro código de retorno.
+ *    - Verificar frente a GNU ls el código de salida
+ *      correspondiente a errores de closedir().
+ *    - Revisar la gestión de errores de escritura.
  */
 void	list_directory(t_ctx *ctx, const char *path)
 {
@@ -211,26 +318,140 @@ void	list_directory(t_ctx *ctx, const char *path)
 	t_directory_list	list;
 	int					flag_read;
 
+	/*
+	 * workflow:
+	 * 1. opendir()
+	 * 2. readdir()  → guardar entradas
+	 * 3. closedir() → se ejecuta antes de ordenar e imprimir, lo que evitará acumular descriptores abiertos durante la futura recursividad
+	 * 4. ordenar entradas
+	 * 5. imprimir entradas
+	 * 6. recorrer subdirectorios con -R TODO
+	 * 7. liberar memoria
+	*/
+	
+	/*
+ 	 * ¡! ETAPA 7 (-R): distinguir el origen del directorio
+ 	 *
+ 	 * PROBLEMA ACTUAL:
+ 	 * list_directory() solo recibe directorios procedentes de
+ 	 * los operandos de argv.
+ 	 *
+ 	 * Cuando implementemos -R, esta misma función también
+ 	 * recibirá subdirectorios descubiertos durante el recorrido.
+ 	 *
+ 	 * Es necesario distinguir ambos casos porque GNU ls puede
+ 	 * asignar distinta gravedad a los errores según el origen
+ 	 * del directorio.
+ 	 *
+ 	 * PROPUESTA: añadir un parámetro is_operand:
+ 	 *
+ 	 * - is_operand = 1:
+ 	 *   El directorio procede directamente de argv.
+ 	 *   Ejemplo: ./ft_ls directorio
+ 	 *
+ 	 * - is_operand = 0:
+ 	 *   El directorio se ha descubierto durante el recorrido -R.
+ 	 *   Ejemplo: ./ft_ls -R directorio
+ 	 *   y posteriormente se procesa directorio/subdirectorio.
+ 	 *
+ 	 * CRITERIO PREVISTO:
+ 	 * - Error de opendir() en un operando: status = 2.
+ 	 * - Error de opendir() en un subdirectorio: status = 1.
+ 	 * - No sobrescribir un status = 2 anterior con status = 1.
+ 	 *
+ 	 * PENDIENTE DE VERIFICACIÓN:
+ 	 * Comprobar frente a GNU ls los códigos correspondientes
+ 	 * a los errores de opendir() y readdir() en ambos casos.
+ 	 * No asumir que ambos tipos de error tienen necesariamente
+ 	 * la misma gravedad sin comprobarlo.
+ 	 *
+ 	 * IMPLEMENTACIÓN FUTURA:
+ 	 * - Añadir is_operand como parámetro de list_directory().
+ 	 * - Pasar is_operand a open_directory() para que pueda
+ 	 *   determinar la gravedad de los errores de apertura.
+ 	 * - Utilizar también esta información al tratar los
+ 	 *   errores de lectura de read_directory().
+ 	 * - Actualizar las llamadas desde handle_directories()
+ 	 *   y desde el futuro recorrido recursivo.
+ 	 *
+ 	 * IMPORTANTE:
+ 	 * is_operand pertenece a cada llamada de list_directory(),
+ 	 * no al contexto global t_ctx.
+ 	 *
+ 	 * Durante una misma ejecución pueden procesarse tanto
+ 	 * operandos originales como subdirectorios descubiertos.
+ 	 * El origen debe conservarse individualmente.
+ 	 *
+ 	 * Este cambio queda pendiente hasta implementar -R.
+  	 */
 	dir = open_directory(ctx, path);
 	if (!dir)
 		return ;
 	init_directory_list(&list);
 	flag_read = read_directory(ctx, path, dir, &list);
-	/* ¡! ETAPA 8: distinguir error de readdir() (recuperable:
-	 * imprimir entradas ya leídas) de error de memoria (fatal:
-	 * no imprimir). Actualmente flag_read == 1 agrupa ambos
-	 */
-	if (flag_read == 0)
-	{
-		print_entries(&list);
-		/* TODO: ordenar Etapa 4 */
-        /* TODO: recorrer subdirectorios si -R */
-	}
-	clean_directory_list(&list);
+	/*
+	 * ¡! ETAPA 8: distinguir errores de lectura y errores de memoria
+	 *
+	 * PROBLEMA ACTUAL:
+	 * read_directory() devuelve 0 si termina correctamente y 1 si falla,
+	 * pero no distingue la causa del fallo:
+	 *
+	 * - flag_read = 0: lectura completa. Ordenar e imprimir las entradas
+	 * - flag_read = 1: puede significar dos situaciones diferentes:
+	 *
+	 *   1. Error de readdir() (recuperable):
+	 *      No se ha podido completar la lectura del directorio, pero
+	 *      podemos ordenar e imprimir las entradas ya almacenadas
+	 *      Debemos informar del error y actualizar ctx->status
+	 *
+	 *   2. Error de memoria (fatal):
+	 *      Ha fallado una reserva de memoria (realloc(), strdup() o
+	 *      build_path()). No debemos continuar el procesamiento normal
+	 *      ctx->fatal = FATAL_NOMEM y debemos liberar la memoria reservada
+	 *
+	 * SOLUCIÓN PENDIENTE:
+	 * Modificar read_directory() para distinguir ambos errores:
+	 *
+	 * - return (0): lectura completada correctamente.
+	 * - return (1): error de lectura recuperable (readdir())
+	 * - return (2): error fatal de memoria
+	 *
+	 * Estos valores son códigos internos de read_directory(), no deben
+	 * confundirse con ctx->status, que representa el código de salida
+	 * global del programa
+	 *
+	 * En list_directory():
+	 * - Resultado 0: ordenar e imprimir
+	 * - Resultado 1: informar del error, ordenar e imprimir lo ya leído
+	 * - Resultado 2: no imprimir; liberar memoria y detener el
+	 *   procesamiento normal
+	 *
+	 * TBD ctx->fatal, también podríamos utilizarlo para distinguir los errores
+	 * sin introducir tres valores de retorno [ELEGIDO]
+	 *
+	 * En todos los casos debemos cerrar el directorio y liberar
+	 * la memoria de la lista.
+	*/
 	if (closedir(dir) == -1)
 	{
 		fprintf(stderr, "%s: closing directory '%s': %s\n",
 			ctx->prog, path, strerror(errno));
+		/*
+     		* ¡! ETAPA 8: verificar frente a GNU ls qué código de salida
+     		* corresponde a un fallo de closedir()
+     		*
+     		* Actualmente se establece status = 2
+     		* Comprobar si la gravedad depende de que el directorio sea
+     		* un operando de argv o un subdirectorio encontrado con -R
+     		* No sobrescribir un status = 2 anterior con uno menor
+     	*/
 		ctx->status = 2;
 	}
+	if (flag_read == 0)
+	{
+		sort_directory_entries(ctx, &list);
+		print_entries(&list);
+        /* TODO: Recursividad -R (pendiente) */
+	}
+	clean_directory_list(&list);
 }
