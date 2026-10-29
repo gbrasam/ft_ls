@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 13:33:40 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/20 13:40:45 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/29 13:05:28 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,23 +21,23 @@
  */
 static int calculate_capacity(size_t capacity, size_t *new_capacity)
 {
-	if (capacity == 0)																/* primera reserva */
+	if (capacity == 0)																						/* primera reserva */
 		*new_capacity = 4;
 	else
 	{
-		if (capacity > SIZE_MAX / 2)												/* evitar desbordamiento al duplicar capacity */
+		if (capacity > SIZE_MAX / 2)																		/* evitar desbordamiento al duplicar capacity */
 			return (1);
 		*new_capacity = capacity * 2;
 	}
-	if (*new_capacity > (SIZE_MAX / sizeof(t_directory_entry)))						/* evitar desbordamiento al calcular los bytes para realloc() */
+	if (*new_capacity > (SIZE_MAX / sizeof(t_directory_entry)))												/* evitar desbordamiento al calcular los bytes para realloc() */
 		return (1);
 
 	return (0);
 }
 
 /*
- * Obtiene los metadatos de una entrada mediante lstat()
- * Solo se llamará cuando alguna opción necesite esos metadatos
+ * obtiene los metadatos de una entrada mediante lstat()
+ * solo se llamará cuando alguna opción necesite esos metadatos (-l, -t y -R)
  *
  * Devuelve:
  * 0: operación completada (aunque lstat haya fallado)
@@ -47,7 +47,7 @@ static int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *
 {
 	char	*path;
 
-	path = build_path(name_directory, entry->name);									/* 'entry.name' contiene "clean.c", pero necesitamos "src/clean.c" para consultar el archivo correcto */
+	path = build_path(name_directory, entry->name);															/* entry->name contiene "clean.c"; construimos "src/clean.c" */
 	if (!path)
 	{
 		ctx->fatal = FATAL_NOMEM;
@@ -57,56 +57,74 @@ static int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *
 		entry->stat_ok = 1;
 	else
 	{
-		fprintf(stderr, "%s: cannot access '%s': %s\n",
-			ctx->prog, path, strerror(errno));
-		ctx->status = 2;
+		fprintf(stderr, "%s: cannot access '%s': %s\n", ctx->prog, path, strerror(errno));
+		if (ctx->status == 0)																				/* solo eleva el estado de 0 a 1, sin reducir un estado 2 anterior */
+			ctx->status = 1;
 	}
 	free(path);
 	return (0);
 }
 
 /*
- * Almacena una entrada del directorio en el array dinámico.
+ * garantizar que hay espacio para guardar una nueva entrada
+ * solo se amplia la memoria cuando es necesario, no en todas las llamadas
+ * - comprobar si queda espacio
+ * - calcular la nueva capacidad
+ * - reservar o ampliar memoria con realloc()
+ * - actualizar list->items y list->capacity solo cuando realloc() tiene éxito
  *
- * - Amplía la capacidad cuando el array está lleno.
- * - Copia el nombre porque readdir() puede reutilizar su memoria.
- * - Obtiene metadatos solo si alguna opción los necesita.
- *
- * Devuelve:
- * 0: entrada almacenada.
- * 1: error fatal de memoria.
+ * ¡! si realloc() falla, list->items sigue apuntando a la memoria anterior,
+ *    porque hemos utilizado el puntero temporal entries
+ *    no se pierden las entradas que ya se habían guardado
  */
-int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *list) 
+static int	ensure_capacity(t_directory_list *list)
 {
 	t_directory_entry	*entries;
 	size_t				new_capacity;
 
-	if (list->count == list->capacity)												/* reservar o ampliar solo cuando el array esté vacio o lleno */
+	if (list->count < list->capacity)																		/* no es necesario ampliar memoria */
+		return (0);
+
+	if (calculate_capacity(list->capacity, &new_capacity) == 1)												/* desbordamiento */
+		return (1);
+
+	entries = realloc(list->items, sizeof(t_directory_entry) * new_capacity);
+	if (!entries)
+		return (1);
+
+	list->items = entries;
+	list->capacity = new_capacity;
+	return (0);
+}
+
+
+/*
+ * almacena una entrada del directorio en el array dinámico
+ *
+ * - amplía la capacidad cuando el array está lleno
+ * - copia el nombre porque readdir() puede reutilizar su memoria
+ * - obtiene metadatos solo si alguna opción los necesita (-l, -t y -R)
+ *
+ * devuelve:
+ * 0: entrada almacenada
+ * 1: error fatal de memoria
+ */
+int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *list) 
+{
+	if (ensure_capacity(list) == 1)																			/* reservar o ampliar solo cuando el array esté vacio o lleno */
 	{
-		if (calculate_capacity(list->capacity, &new_capacity) == 1)
-		{
-			ctx->fatal = FATAL_NOMEM;
-			return (1);
-		}
-		entries = realloc(list->items, sizeof(t_directory_entry) * new_capacity);
-		if (!entries)
-		{
-			ctx->fatal = FATAL_NOMEM;
-			return (1);
-		}
-		list->items = entries;
-		list->capacity = new_capacity;
+		ctx->fatal = FATAL_NOMEM;
+		return (1);
 	}
 
-	list->items[list->count].name = strdup(name_entry);								/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
+	list->items[list->count].name = strdup(name_entry);														/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
 	if (!list->items[list->count].name)
 	{
 		ctx->fatal = FATAL_NOMEM;
 		return (1);
 	}
 
-	list->items[list->count].stat_ok = 0;											/* los metadatos no son válidos hasta que lstat() tenga éxito */
-
+	list->items[list->count].stat_ok = 0;																	/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
 	if (ctx->opts.l || ctx->opts.t || ctx->opts.big_r)
 	{
 		if (load_stat(ctx, name_directory, &list->items[list->count]) == 1)

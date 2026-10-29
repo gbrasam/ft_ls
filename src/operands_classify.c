@@ -6,54 +6,62 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 12:10:27 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/20 12:20:50 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/29 13:05:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
 /*
- * Consulta los metadatos de una ruta y clasifica el operando
- * → consulta stat() y devuelve tipo/error
+ * Consulta los metadatos de una ruta y clasifica el operando.
+ * → utiliza stat() y guarda el tipo, error y metadatos en t_operand_info.
  *
  * Utiliza stat(), que sigue los enlaces simbólicos y consulta
- * los metadatos del objeto al que apuntan
+ * los metadatos del objeto al que apuntan.
  *
  * stat(const char *path, struct stat *buf):
- * - path: ruta que se quiere consultar
- * - buf: puntero a la estructura donde se guardan los metadatos
- * - Devuelve 0 si tiene éxito y -1 si falla (establece errno)
+ * - path: ruta que se quiere consultar (info->name).
+ * - buf: puntero a la estructura donde se guardan los metadatos (&info->st).
+ * - Devuelve 0 si tiene éxito y -1 si falla (establece errno).
  *
- * struct stat st:
- * - st es la variable local que recibe los metadatos
- * - st.st_mode contiene el tipo de archivo y sus permisos
- * - S_ISDIR(st.st_mode) devuelve un valor distinto de 0
- *   si es un directorio, y 0 en caso contrario
+ * struct stat info->st:
+ * - Los metadatos se guardan directamente en la estructura del operando.
+ * - info->st.st_mode contiene el tipo de archivo y sus permisos.
+ * - S_ISDIR(info->st.st_mode) devuelve un valor distinto de 0
+ *   si es un directorio, y 0 en caso contrario.
+ * - info->stat_ok indica si los metadatos son válidos (1) o no (0).
  *
  * Resultado:
- * - OPS_ERROR: stat() falla; guarda errno en *error
- * - OPS_DIRECTORY: el objeto es un directorio
- * - OPS_FILE: cualquier otro tipo de objeto válido
+ * - OPS_ERROR: stat() falla; guarda errno en info->err y stat_ok = 0.
+ * - OPS_DIRECTORY: es un directorio; stat_ok = 1 y err = 0.
+ * - OPS_FILE: cualquier otro tipo de objeto válido; stat_ok = 1 y err = 0.
  *
+ * No devuelve ningún valor: modifica directamente la estructura recibida.
  * No imprime errores ni modifica ctx->status.
  */
-static t_operand_kind	get_operand_kind(const char *name, int *error)
+static void	get_operand_info(t_operand_info	*info)
 {
-	struct stat st;
 
-	if (stat(name, &st) == -1)
+	if (stat(info->name, &info->st) == -1)													/* la idea es que stat guarde los metadatos directamente en la estructura del operando */
 	{
-		*error = errno;
-		return (OPS_ERROR);	
+		info->stat_ok = 0;
+		info->err = errno;
+		info->kind = OPS_ERROR;
 	}
-	if (S_ISDIR(st.st_mode) != 0)
-		return (OPS_DIRECTORY);
-	return (OPS_FILE);
+	else
+	{
+		info->stat_ok = 1;
+		info->err = 0;
+		if (S_ISDIR(info->st.st_mode) != 0)
+			info->kind = OPS_DIRECTORY;
+		else
+			info->kind = OPS_FILE;
+	}
 }
 
 /*
- * Clasifica todos los operandos recibidos por parse_args()
- * → guarda los resultados de todos los operandos
+ * Clasifica todos los operandos recibidos por parse_args().
+ * → guarda el nombre, tipo, error y metadatos de cada operando.
  *
  * La memoria de operand_list->items ya está reservada por run_ls().
  *
@@ -61,13 +69,18 @@ static t_operand_kind	get_operand_kind(const char *name, int *error)
  * 2. Determina el nombre de cada operando:
  *    - Si no hay operandos explícitos, utiliza ".".
  *    - En caso contrario, conserva la ruta original de argv.
- * 3. Consulta cada ruta mediante get_operand_kind().
- * 4. Rellena name, kind y err de cada entrada.
+ * 3. Llama a get_operand_info() para consultar cada ruta mediante stat().
+ * 4. Rellena los campos de cada t_operand_info:
+ *    - name: nombre o ruta original del operando.
+ *    - kind: OPS_FILE, OPS_DIRECTORY u OPS_ERROR.
+ *    - err: errno si stat() falla; 0 si tiene éxito.
+ *    - st: metadatos obtenidos mediante stat() (válidos si stat_ok = 1).
+ *    - stat_ok: 1 si stat() tiene éxito; 0 si falla.
  *
  * Modifica operand_list a través de su puntero.
- * No devuelve una colección nueva ni reserva memoria.
+ * No devuelve una colección nueva ni reserva memoria adicional.
  *
- * No imprime ni ordena: conserva el orden original.
+ * No imprime ni ordena: conserva el orden original de los operandos.
  */
 void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list)
 {
@@ -81,8 +94,7 @@ void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list
 			operand_list->items[i].name = ".";
 		else
 			operand_list->items[i].name = ops->items[i];
-		operand_list->items[i].err = 0;
-		operand_list->items[i].kind = get_operand_kind(operand_list->items[i].name, &operand_list->items[i].err);
+		get_operand_info(&operand_list->items[i]);
 		i++;
 	}
 }

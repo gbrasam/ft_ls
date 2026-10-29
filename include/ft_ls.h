@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/20 14:11:59 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/29 13:05:11 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -110,7 +110,7 @@ typedef struct s_opts
  *          - opción corta: apunta al carácter inválido
  *          - opción larga: apunta al argumento completo
  *          No modifica la cadena original ni reserva memoria.
- * status   código con el que terminará el programa (0, 1 o 2)
+ * status (*) código con el que terminará el programa (0, 1 o 2)
  *			0 = ejecución correcta, sin errores
  *			1 = problema menor, p. ej. no poder acceder a un subdirectorio con -R
  *			2 = problema grave: opción no válida, operando de argv inaccesible, sin memoria
@@ -127,6 +127,30 @@ typedef struct s_opts
  * - Si tenemos un puntero: t_ctx *ctx; -> ctx->prog
  *   (equivalente a (*ctx).prog)
  * - Si tenemos la struct:  t_ctx ctx;  -> ctx.prog
+ * 
+ * (*) status
+ * GNU ls distingue la gravedad de los errores:
+ *
+ * - status = 0: no se han producido errores.
+ * - status = 1: error menor al procesar una entrada encontrada dentro
+ *   de un directorio (por ejemplo, lstat() falla sobre una entrada
+ *   obtenida mediante readdir()).
+ * - status = 2: error grave, por ejemplo, cuando no se puede acceder
+ *   a un operando solicitado directamente en argv.
+ *
+ * ctx->status es global a toda la ejecución de ft_ls, no pertenece
+ * a cada operando ni a cada entrada del directorio.
+ *
+ * Por tanto, debe conservar el error de mayor gravedad encontrado:
+ * si ya vale 2 por un error anterior, un error menor posterior
+ * no debe reducirlo a 1.
+ *
+ * Solo establecemos status = 1 cuando su valor actual es 0.
+ * Si ya vale 1 o 2, lo mantenemos.
+ *
+ * El fallo de lstat() no es fatal para el procesamiento:
+ * conservamos el nombre de la entrada, dejamos stat_ok = 0
+ * y continuamos con las demás entradas del directorio.
  */
 typedef struct s_ctx
 {
@@ -147,6 +171,8 @@ typedef struct s_operand_info
 	const char		*name;
 	t_operand_kind	kind;
 	int				err;						/* errno */
+	struct stat		st;
+	int				stat_ok;					/* flag 1: st válido; 0: stat() no llamado o fallido */
 }	t_operand_info;
 
 typedef struct s_operand_list
@@ -204,7 +230,7 @@ typedef struct s_directory_entry
 {
 	char		*name;
 	struct stat	st;
-	int			stat_ok;						/* 1: st válido; 0: lstat() no llamado o fallido */
+	int			stat_ok;						/* flag 1: st válido; 0: lstat() no llamado o fallido */
 }	t_directory_entry;
 
 typedef struct s_directory_list

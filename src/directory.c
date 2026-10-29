@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/20 15:35:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/29 13:10:59 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -89,6 +89,7 @@ static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_li
 	}
 	return (0);
 }
+
 
 /**
  * PROVISIONAL hasta Etapa 5
@@ -180,7 +181,6 @@ static void	print_entries(const t_directory_list *list)
  *      solo cuando están activadas las opciones -l, -t o -R
  *
  *    PENDIENTE:
- *    - Filtrar nombres ocultos según -a
  *    - Ordenar por nombre o fecha (-t), considerando -r
  *    - Mostrar las entradas (formato normal o -l)
  *    - Descender a subdirectorios si está activado -R
