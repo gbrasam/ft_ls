@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/20 12:15:53 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/20 14:11:59 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -234,7 +234,10 @@ void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list
 void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* directory.c */
-void	list_directory(t_ctx *ctx, t_operand_info *operand);
+void	list_directory(t_ctx *ctx, const char *path);
+
+/* directory_entries.c */
+int		store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *list);
 
 /* sort.c */
 void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
@@ -243,8 +246,10 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 void	report_fatal(t_ctx *ctx);
 
 /* clean.c */
-
 void	clean_all(t_ctx *ctx, t_operands *ops);
 void	clean_directory_list(t_directory_list *list);
+
+/* utils.c */
+char	*build_path(const char *name_directory, const char *name_entry);
 
 #endif

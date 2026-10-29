@@ -6,7 +6,7 @@
 #    By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/10/02 11:41:25 by gebravo           #+#    #+#              #
-#    Updated: 2026/10/20 12:15:51 by gebravo          ###   ########.fr        #
+#    Updated: 2026/10/20 13:40:28 by gebravo          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -26,9 +26,11 @@ SRCS		= $(SRC_DIR)/main.c \
 			  $(SRC_DIR)/operands_classify.c \
 			  $(SRC_DIR)/operands_handle.c \
 			  $(SRC_DIR)/directory.c \
+			  $(SRC_DIR)/directory_entries.c \
 			  $(SRC_DIR)/sort.c \
 			  $(SRC_DIR)/error.c \
-			  $(SRC_DIR)/clean.c
+			  $(SRC_DIR)/clean.c \
+			  $(SRC_DIR)/utils.c
 OBJS		= $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 DEPS		= $(OBJS:.o=.d)
 

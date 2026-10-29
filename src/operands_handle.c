@@ -6,29 +6,13 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/20 12:18:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/20 14:45:10 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
-static void	handle_error(t_ctx *ctx, t_operand_info *operand)
-{
-	fprintf(stderr, "%s: cannot access '%s': %s\n",
-		ctx->prog,
-		operand->name,
-		strerror(operand->err));
-	ctx->status = 2;
-}
-
-static void	handle_file(t_ctx *ctx, t_operand_info *operand)
-{
-	(void)ctx;
-	fprintf(stdout, "%s\n", operand->name);
-	/* TODO incorporar la presentación de metadatos para -l */
-}
-
-static void	handle_non_directories(t_ctx *ctx, t_operand_list *operand_list)
+static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 {
 	size_t	i;
 
@@ -36,9 +20,30 @@ static void	handle_non_directories(t_ctx *ctx, t_operand_list *operand_list)
 	while (i < operand_list->count)
 	{
 		if (operand_list->items[i].kind == OPS_ERROR)
-			handle_error(ctx, &operand_list->items[i]);
-		else if (operand_list->items[i].kind == OPS_FILE)
-			handle_file(ctx, &operand_list->items[i]);
+		{
+			fprintf(stderr, "%s: cannot access '%s': %s\n",
+				ctx->prog,
+				operand_list->items[i].name,
+				strerror(operand_list->items[i].err));
+			ctx->status = 2;
+		}
+		i++;
+	}
+}
+
+static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
+{
+	size_t	i;
+
+	(void)ctx;
+	i = 0;
+	while (i < operand_list->count)
+	{
+		if (operand_list->items[i].kind == OPS_FILE)
+		{
+			fprintf(stdout, "%s\n", operand_list->items[i].name);
+			/* TODO incorporar metadatos para -l */
+		}
 		i++;
 	}
 }
@@ -51,15 +56,17 @@ static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 	while (i < operand_list->count && ctx->fatal == FATAL_NONE)
 	{
 		if (operand_list->items[i].kind == OPS_DIRECTORY)
-			list_directory(ctx, &operand_list->items[i]);
+			list_directory(ctx, operand_list->items[i].name);
 		i++;
 	}
-	/* TODO coordinar el procesamiento de directorios, incluida la recursividad -R */
+	/* TODO coordinar la recursividad -R */
 }
 
 /*
- * [GNU ls] presenta los operandos no directorio antes de listar los directorios,
+ * [GNU ls]	presenta los operandos no directorio antes de listar los directorios,
  * 			independientemente del orden de los argumentos
+ * [GNU ls]	informa de todos los errores primero, luego muestra los archivos
+ *			y por último los directorios
  */
 void	handle_operands(t_ctx *ctx, t_operand_list *operand_list)
 {
@@ -68,7 +75,10 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list)
 	sort_operands(ctx, operand_list);
 	if (ctx->fatal != FATAL_NONE)
 		return ;
-	handle_non_directories(ctx, operand_list);
+	handle_error(ctx, operand_list);
+	if (ctx->fatal != FATAL_NONE)
+		return ;
+	handle_files(ctx, operand_list);
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	handle_directories(ctx, operand_list);
