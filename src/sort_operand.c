@@ -1,0 +1,183 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   sort_operand.c                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/10/15 16:37:54 by gebravo           #+#    #+#             */
+/*   Updated: 2026/10/30 13:15:48 by gebravo          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "ft_ls.h"
+
+/*
+ * Compara dos operandos por su nombre.
+ *
+ * qsort() entrega punteros genéricos (const void *).
+ * Los convertimos a t_operand_info para acceder a name.
+ *
+ * strcmp() es seguro también para OPS_ERROR porque
+ * el nombre del operando sigue siendo válido.
+ *
+ * No consulta struct stat ni necesita comprobar stat_ok.
+ */
+static int	compare_operand_name(const void *a, const void *b)
+{
+	const t_operand_info	*operand_a;
+	const t_operand_info	*operand_b;
+
+	operand_a = (const t_operand_info *)a;
+	operand_b = (const t_operand_info *)b;
+	return (strcmp(operand_a->name, operand_b->name));
+}
+
+/*
+ * Invierte in-place el orden de los operandos.
+ *
+ * Utiliza dos índices que avanzan desde los extremos
+ * hacia el centro del array.
+ *
+ * En cada iteración intercambia dos estructuras completas,
+ * conservando asociados el nombre y sus metadatos.
+ *
+ * No reserva memoria adicional: tmp es una variable local.
+ *
+ * Si count < 2, no hay nada que invertir.
+ */
+static void	reverse_operands(t_operand_list *operand_list)
+{
+	t_operand_info	tmp;
+	size_t			left_index;
+	size_t			right_index;
+
+	if (operand_list->count < 2)
+		return ;
+	left_index = 0;
+	right_index = operand_list->count - 1;
+	while (left_index < right_index)
+	{
+		tmp = operand_list->items[left_index];
+		operand_list->items[left_index] = operand_list->items[right_index];
+		operand_list->items[right_index] = tmp;
+		left_index++;
+		right_index--;
+	}
+}
+
+/*
+ * Ordena los operandos recibidos por argv.
+ *
+ * FUNCIONAMIENTO:
+ *
+ * 1. Si hay menos de dos operandos, no es necesario ordenar.
+ *
+ * 2. Utiliza qsort() con compare_operand_name() para ordenar
+ *    los operandos por nombre mediante strcmp().
+ *
+ * 3. Si la opción -r está activada, llama a reverse_operands()
+ *    para invertir el orden obtenido.
+ *
+ * TIPOS DE OPERANDOS:
+ *
+ * El array operand_list->items puede contener:
+ *
+ * - OPS_FILE: archivo u otro objeto válido.
+ * - OPS_DIRECTORY: directorio válido.
+ * - OPS_ERROR: operando cuyo acceso ha fallado.
+ *
+ * No es necesario agrupar archivos y directorios dentro del
+ * array, porque handle_files() y handle_directories() recorren
+ * los elementos y seleccionan los correspondientes según kind.
+ *
+ * ORDEN DE LOS ERRORES:
+ *
+ * GNU ls muestra los errores de los operandos en el orden
+ * original de argv, independientemente de la ordenación.
+ *
+ * Para conservar este comportamiento, handle_operands()
+ * llama a handle_error() antes de sort_operands().
+ *
+ * Así, los errores se imprimen antes de que qsort() o
+ * reverse_operands() modifiquen el orden del array.
+ *
+ * Las estructuras OPS_ERROR permanecen en el array, pero
+ * su posición posterior ya no afecta al orden de los errores
+ * mostrados por pantalla.
+ *
+ * METADATOS DE LOS OPERANDOS:
+ *
+ * qsort() y reverse_operands() reorganizan estructuras
+ * t_operand_info completas, no únicamente sus nombres.
+ *
+ * Por tanto, cada operando conserva asociados:
+ * - name: nombre o ruta del operando.
+ * - kind: tipo de operando.
+ * - err: código de error, si corresponde.
+ * - st: metadatos obtenidos mediante stat() o lstat().
+ * - stat_ok: indica si los metadatos son válidos.
+ *
+ * En los operandos OPS_ERROR, stat_ok = 0 y los metadatos
+ * de struct stat no deben consultarse.
+ *
+ * La ordenación actual por nombre es segura para estos
+ * operandos porque strcmp() únicamente utiliza name,
+ * que sigue siendo válido.
+ *
+ * ORDENACIÓN CON qsort():
+ *
+ * qsort() recibe:
+ * - La dirección del primer elemento del array.
+ * - El número de elementos.
+ * - El tamaño de cada estructura t_operand_info.
+ * - La función comparadora compare_operand_name().
+ *
+ * El comparador determina qué elemento debe ir antes,
+ * mientras que qsort() se encarga de reorganizar el array.
+ *
+ * qsort() no garantiza estabilidad: dos elementos para los
+ * que el comparador devuelve 0 podrían cambiar de posición.
+ *
+ * Esto no afecta al orden de los errores mostrados, porque
+ * ya se han procesado antes de realizar la ordenación.
+ *
+ * OPCIÓN -r:
+ *
+ * La opción -r no modifica el criterio del comparador.
+ *
+ * Primero se obtiene el orden normal mediante qsort().
+ * Después, reverse_operands() invierte el array in-place,
+ * intercambiando estructuras completas desde los extremos
+ * hacia el centro.
+ *
+ * De esta manera, la inversión es independiente del criterio
+ * utilizado para ordenar y podrá reutilizarse con -t.
+ *
+ * OPCIÓN -t:
+ *
+ * Actualmente no está implementada en esta función.
+ *
+ * Cuando se incorpore, será necesario comparar las fechas
+ * de modificación de los operandos válidos, teniendo en
+ * cuenta segundos y nanosegundos.
+ *
+ * También deberá evitarse consultar struct stat cuando
+ * stat_ok = 0 y establecer un criterio de comparación
+ * coherente para los operandos OPS_ERROR.
+ *
+ * La inversión mediante -r seguirá realizándose después
+ * de la ordenación, sin necesidad de modificar
+ * reverse_operands().
+ */
+void	sort_operands(t_ctx *ctx, t_operand_list *operand_list)
+{
+	if (operand_list->count < 2)
+		return ;
+	qsort(operand_list->items,
+		operand_list->count,
+		sizeof(t_operand_info),
+		compare_operand_name);
+	if (ctx->opts.r == 1)
+		reverse_operands(operand_list);
+}
