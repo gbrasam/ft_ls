@@ -6,18 +6,30 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/29 17:40:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/30 15:55:55 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
 /*
- * Los errores se muestran antes de ordenar para conservar
- * el orden original de argv, como hace GNU ls.
+ * Gestiona los operandos clasificados como OPS_ERROR.
  *
- * Después, sort_operands() puede reorganizar el array sin
- * afectar al orden de los errores ya mostrados.
+ * Se ejecuta antes de sort_operands() para conservar el
+ * orden original de argv en los mensajes de error.
+ *
+ * Recorre operand_list y muestra por stderr un mensaje
+ * por cada operando cuyo kind sea OPS_ERROR.
+ *
+ * ctx->status = 2 indica que se ha producido un error.
+ * No detiene el procesamiento de los operandos válidos.
+ *
+ * Las opciones de ordenación (-r y -t) no modifican
+ * el orden de los errores mostrados, porque estos
+ * se procesan antes de reorganizar el array.
+ *
+ * Los operandos OPS_ERROR permanecen en el array,
+ * pero handle_files() y handle_directories() los omiten.
  */
 static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 {

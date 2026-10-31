@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:37:54 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/30 13:15:48 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/10/30 15:55:45 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,83 @@ static int	compare_operand_name(const void *a, const void *b)
 	operand_a = (const t_operand_info *)a;
 	operand_b = (const t_operand_info *)b;
 	return (strcmp(operand_a->name, operand_b->name));
+}
+
+/*
+ * Compara dos operandos para ordenarlos por fecha de modificación (-t).
+ *
+ * qsort() entrega dos punteros genéricos (const void *).
+ * Se convierten a const t_operand_info * para acceder
+ * a sus metadatos y a su nombre.
+ *
+ * CRITERIO DE ORDENACIÓN:
+ *
+ * 1. Comprobar stat_ok antes de acceder a struct stat.
+ *
+ *    - Ambos válidos: comparar sus fechas.
+ *    - Uno válido y otro inválido: colocar primero el válido.
+ *    - Ambos inválidos: ordenar por nombre.
+ *
+ * 2. Si ambos tienen metadatos válidos:
+ *
+ *    - Comparar st_mtim.tv_sec (segundos).
+ *    - Si coinciden, comparar st_mtim.tv_nsec (nanosegundos).
+ *    - La fecha más reciente debe aparecer primero.
+ *
+ * 3. Si las fechas son idénticas, desempatar por nombre
+ *    mediante compare_operand_name().
+ *
+ * RELACIÓN ENTRE stat_ok Y OPS_ERROR:
+ *
+ * En la implementación actual de get_operand_info():
+ *
+ * - stat_ok == 1: OPS_FILE u OPS_DIRECTORY.
+ * - stat_ok == 0: OPS_ERROR.
+ *
+ * stat_ok indica si los metadatos pueden consultarse.
+ * kind indica cómo debe procesarse el operando.
+ *
+ * No es necesario comprobar kind en este comparador,
+ * porque stat_ok ya determina si st_mtim es válido.
+ *
+ * Los errores ya se han mostrado mediante handle_error()
+ * antes de ejecutar sort_operands().
+ *
+ * VALORES DEVUELTOS:
+ *
+ * - Negativo: el primer operando debe aparecer antes.
+ * - Positivo: el primer operando debe aparecer después.
+ * - Cero: ambos son equivalentes según el comparador.
+ *
+ * No se restan las fechas para evitar problemas de
+ * rango al convertir time_t a int.
+ *
+ * La opción -r se aplica después de qsort(), por lo que
+ * este comparador siempre establece el orden normal de -t.
+ */
+static int compare_operand_time(const void *a, const void *b)
+{
+	const t_operand_info	*operand_a;
+	const t_operand_info	*operand_b;
+
+	operand_a = (const t_operand_info *)a;
+	operand_b = (const t_operand_info *)b;
+	if (operand_a->stat_ok == 1 && operand_b->stat_ok == 0)
+		return (-1);
+	if (operand_a->stat_ok == 0 && operand_b->stat_ok == 1)
+		return (1);
+	if (operand_a->stat_ok == 1 && operand_b->stat_ok == 1)
+	{
+		if (operand_a->st.st_mtim.tv_sec > operand_b->st.st_mtim.tv_sec)
+			return (-1);
+		if (operand_a->st.st_mtim.tv_sec < operand_b->st.st_mtim.tv_sec)
+			return (1);
+		if (operand_a->st.st_mtim.tv_nsec > operand_b->st.st_mtim.tv_nsec)
+			return (-1);
+		if (operand_a->st.st_mtim.tv_nsec < operand_b->st.st_mtim.tv_nsec)
+			return (1);
+	}
+	return (compare_operand_name(a, b));
 }
 
 /*
@@ -174,10 +251,16 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list)
 {
 	if (operand_list->count < 2)
 		return ;
-	qsort(operand_list->items,
-		operand_list->count,
-		sizeof(t_operand_info),
-		compare_operand_name);
+	if (ctx->opts.t == 1)
+		qsort(operand_list->items,
+			operand_list->count,
+			sizeof(t_operand_info),
+			compare_operand_time);
+	else
+		qsort(operand_list->items,
+			operand_list->count,
+			sizeof(t_operand_info),
+			compare_operand_name);
 	if (ctx->opts.r == 1)
 		reverse_operands(operand_list);
 }
