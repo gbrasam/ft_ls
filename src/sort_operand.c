@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:37:54 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/30 15:55:45 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 12:55:38 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -251,7 +251,7 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list)
 {
 	if (operand_list->count < 2)
 		return ;
-	if (ctx->opts.t == 1)
+	if (ctx->opts.t)
 		qsort(operand_list->items,
 			operand_list->count,
 			sizeof(t_operand_info),
@@ -261,6 +261,6 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list)
 			operand_list->count,
 			sizeof(t_operand_info),
 			compare_operand_name);
-	if (ctx->opts.r == 1)
+	if (ctx->opts.r)
 		reverse_operands(operand_list);
 }

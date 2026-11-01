@@ -6,11 +6,13 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/30 15:55:55 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 13:20:00 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
+
+/* ------------------------------------------------ handle_error ------------------------------------------------ */
 
 /*
  * Gestiona los operandos clasificados como OPS_ERROR.
@@ -50,22 +52,43 @@ static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 	}
 }
 
-static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
+/* ------------------------------------------------ handle_files ------------------------------------------------ */
+
+static void	prepare_files_widths(t_operand_list *operand_list, t_print_widths *widths)
+{
+	(void)operand_list;
+	(void)widths;
+}
+
+static void	print_files(t_ctx *ctx, const t_operand_list *operand_list, const t_print_widths *widths)
 {
 	size_t	i;
 
-	(void)ctx;
 	i = 0;
 	while (i < operand_list->count)
 	{
 		if (operand_list->items[i].kind == OPS_FILE)
 		{
-			fprintf(stdout, "%s\n", operand_list->items[i].name);
-			/* TODO incorporar metadatos para -l */
+			if (ctx->opts.l)
+				print_long_format(operand_list->items[i].name, &operand_list->items[i].st, widths);
+			else
+				fprintf(stdout, "%s\n", operand_list->items[i].name);
 		}
 		i++;
 	}
 }
+
+static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
+{
+	t_print_widths	widths;
+
+	init_print_widths(&widths);
+	if (ctx->opts.l)
+		prepare_files_widths(operand_list, &widths);
+	print_files(ctx, operand_list, &widths);
+}
+
+/* --------------------------------------------- handle_directories --------------------------------------------- */
 
 static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 {

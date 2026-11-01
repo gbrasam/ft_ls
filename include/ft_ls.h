@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/30 13:15:58 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 13:10:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -95,7 +95,7 @@ typedef enum e_fatal
 typedef struct s_opts
 {
 	int	l;
-	int	big_r;									/* -R */
+	int	big_r;														/* -R */
 	int	a;
 	int	r;
 	int	t;
@@ -170,9 +170,9 @@ typedef struct s_operand_info
 {
 	const char		*name;
 	t_operand_kind	kind;
-	int				err;						/* errno */
+	int				err;											/* errno */
 	struct stat		st;
-	int				stat_ok;					/* flag 1: st válido; 0: stat() no llamado o fallido */
+	int				stat_ok;										/* flag 1: st válido; 0: stat() no llamado o fallido */
 }	t_operand_info;
 
 typedef struct s_operand_list
@@ -230,22 +230,82 @@ typedef struct s_directory_entry
 {
 	char		*name;
 	struct stat	st;
-	int			stat_ok;						/* flag 1: st válido; 0: lstat() no llamado o fallido */
+	int			stat_ok;											/* flag 1: st válido; 0: lstat() no llamado o fallido */
 }	t_directory_entry;
 
 typedef struct s_directory_list
 {
 	t_directory_entry	*items;
-	size_t				count;      			/* entradas almacenadas */
-	size_t				capacity;   			/* espacio reservado, en número de entradas */
+	size_t				count;      								/* entradas almacenadas */
+	size_t				capacity;   								/* espacio reservado, en número de entradas */
 }	t_directory_list;
+
+/*
+ * Almacena los anchos máximos de las columnas del formato largo (-l).
+ *
+ * Solo se almacenan los anchos de las columnas cuya longitud puede
+ * variar entre archivos: enlaces, propietario, grupo y tamaño.
+ * Las columnas de ancho fijo (tipo, permisos y fecha) y el nombre
+ * del archivo no necesitan este cálculo.
+ *
+ * Los anchos se calculan por listado, antes de imprimir sus entradas,
+ * para mantener las columnas alineadas.
+ *
+ * - Operandos OPS_FILE: se calculan los anchos de los archivos
+ *   recibidos como argumentos, sin mostrar la línea "total".
+ *
+ * - Entradas de directorio (operandos OPS_DIRECTORY):
+ *   se calculan los anchos y, por separado, el total de bloques
+ *   de las entradas que se van a mostrar.
+ *   Cada directorio tiene sus propios anchos y su propio total.
+ *
+ * Ejemplo: ls -l src/
+ *
+ * total 16
+ * -rw-r--r-- 1 ana staff  800 oct 31 12:00 main.c
+ * -rw-r--r-- 1 ana staff 2500 oct 30 10:00 utils.c
+ *
+ * "total" no representa el número de archivos ni la suma de st_size,
+ * sino los bloques de disco asignados, calculados a partir de st_blocks.
+ * En Linux, st_blocks se expresa normalmente en unidades de 512 bytes;
+ * GNU ls suele mostrar el total en unidades de 1024 bytes por defecto,
+ * aunque puede variar según la configuración.
+ *
+ * Al listar archivos directamente (ls -l main.c utils.c), no se
+ * muestra "total", porque no se está listando un directorio.
+ * 
+ * st->st_size → tamaño real del archivo, expresado en bytes para archivos regulares
+ * widths.size → número máximo de caracteres necesarios para imprimir ese tamaño dentro del listado
+ * st_size = 800	→ 3 caracteres widths.size = 3;
+ * st_size = 2500	→ 5 caracteres widths.size = 5;
+ * Esto permite reservar 'size' posiciones para la columna del tamaño
+ * y alinear los números a la derecha
+ * 
+ * IMPORTANTE: El ancho se refiere al número de caracteres de la
+ * representación impresa, no al tamaño del dato en memoria.
+ *
+ * Por ejemplo, st_nlink puede imprimirse como 1, 12 o 125
+ * (1, 2 o 3 caracteres), aunque su tipo ocupe un tamaño fijo
+ * en memoria. Lo mismo ocurre con st_size.
+ *
+ * Por eso utilizamos size_t: cada campo almacena una cantidad
+ * de caracteres, no el valor original del metadato.
+ */
+typedef struct s_print_widths
+{
+	size_t	nlink;													/* ancho máximo de st_nlink (número de hard links) */
+	size_t	owner;													/* ancho máximo del propietario (st_uid -> getpwuid()) */
+	size_t	group;													/* ancho máximo del grupo (st_gid -> getgrgid()) */
+	size_t	size;													/* ancho máximo de la columna st_size, en caracteres */
+}	t_print_widths;
+
 
 
 /* init.c */
 void	init_ctx(t_ctx *ctx, const char *prog);
 void	init_ops(t_operands *ops);
 void	init_operand_list(t_operand_list *operand_list);
-void	init_directory_list(t_directory_list *list);
+void	init_directory_list(t_directory_list *directory_list);
 
 /* parser.c */
 int		parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops);
@@ -263,13 +323,19 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 void	list_directory(t_ctx *ctx, const char *path);
 
 /* directory_entries.c */
-int		store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *list);
+int		store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *directory_list);
 
 /* sort_directory.c */
 void	sort_directory_entries(t_ctx *ctx, t_directory_list *directory_list);
 
 /* sort_operand.c */
 void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
+
+/* long_format.c */
+/* fase 1: preparación del listado */
+void	update_print_widths(t_print_widths *widths, const struct stat *st);
+/* fase 2: impresión del formato largo */
+void	print_long_format(const char *name, const struct stat *st, const t_print_widths *widths);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);

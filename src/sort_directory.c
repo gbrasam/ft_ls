@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:37:54 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/30 15:55:50 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 12:55:41 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -222,7 +222,7 @@ void	sort_directory_entries(t_ctx *ctx, t_directory_list *directory_list)
 	if (directory_list->count < 2)
 		return ;
 
-	if (ctx->opts.t == 1)
+	if (ctx->opts.t)
 		qsort(directory_list->items,
 			directory_list->count,
 			sizeof(t_directory_entry),
@@ -233,6 +233,6 @@ void	sort_directory_entries(t_ctx *ctx, t_directory_list *directory_list)
 			sizeof(t_directory_entry),
 			compare_directory_name);
 
-	if (ctx->opts.r == 1)
+	if (ctx->opts.r)
 		reverse_directory_entries(directory_list);
 }

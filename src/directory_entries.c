@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 13:33:40 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/29 13:05:28 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 13:10:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,44 +21,49 @@
  */
 static int calculate_capacity(size_t capacity, size_t *new_capacity)
 {
-	if (capacity == 0)																						/* primera reserva */
+	if (capacity == 0)																									/* primera reserva */
 		*new_capacity = 4;
 	else
 	{
-		if (capacity > SIZE_MAX / 2)																		/* evitar desbordamiento al duplicar capacity */
+		if (capacity > SIZE_MAX / 2)																					/* evitar desbordamiento al duplicar capacity */
 			return (1);
 		*new_capacity = capacity * 2;
 	}
-	if (*new_capacity > (SIZE_MAX / sizeof(t_directory_entry)))												/* evitar desbordamiento al calcular los bytes para realloc() */
+	if (*new_capacity > (SIZE_MAX / sizeof(t_directory_entry)))															/* evitar desbordamiento al calcular los bytes para realloc() */
 		return (1);
 
 	return (0);
 }
 
 /*
- * obtiene los metadatos de una entrada mediante lstat()
- * solo se llamará cuando alguna opción necesite esos metadatos (-l, -t y -R)
+ * Obtiene mediante lstat() los metadatos de cada entrada descubierta
+ * con readdir() dentro de un directorio
+ * 
+ * Solo se llama cuando alguna opción requiere esos metadatos (-l, -t, -R)
  *
  * Devuelve:
- * 0: operación completada (aunque lstat haya fallado)
- * 1: error fatal de memoria
+ * 0: operación no fatal (aunque lstat() haya fallado)
+ * 1: error fatal por fallo de memoria al construir la ruta
+ * 
+ * cuando falla lstat(), la función informa del error y actualiza ctx->status,
+ * pero no interrumpe el recorrido del directorio
  */
-static int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *entry)
+static int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *directory_entry)
 {
 	char	*path;
 
-	path = build_path(name_directory, entry->name);															/* entry->name contiene "clean.c"; construimos "src/clean.c" */
+	path = build_path(name_directory, directory_entry->name);															/* entry->name contiene "clean.c"; construimos "src/clean.c" */
 	if (!path)
 	{
 		ctx->fatal = FATAL_NOMEM;
 		return (1);
 	}
-	if (lstat(path, &entry->st) == 0)
-		entry->stat_ok = 1;
+	if (lstat(path, &directory_entry->st) == 0)
+		directory_entry->stat_ok = 1;
 	else
 	{
 		fprintf(stderr, "%s: cannot access '%s': %s\n", ctx->prog, path, strerror(errno));
-		if (ctx->status == 0)																				/* solo eleva el estado de 0 a 1, sin reducir un estado 2 anterior */
+		if (ctx->status == 0)																							/* solo eleva el estado de 0 a 1, sin reducir un estado 2 anterior */
 			ctx->status = 1;
 	}
 	free(path);
@@ -77,23 +82,23 @@ static int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *
  *    porque hemos utilizado el puntero temporal entries
  *    no se pierden las entradas que ya se habían guardado
  */
-static int	ensure_capacity(t_directory_list *list)
+static int	ensure_capacity(t_directory_list *directory_list)
 {
 	t_directory_entry	*entries;
 	size_t				new_capacity;
 
-	if (list->count < list->capacity)																		/* no es necesario ampliar memoria */
+	if (directory_list->count < directory_list->capacity)																/* no es necesario ampliar memoria */
 		return (0);
 
-	if (calculate_capacity(list->capacity, &new_capacity) == 1)												/* desbordamiento */
+	if (calculate_capacity(directory_list->capacity, &new_capacity) == 1)												/* desbordamiento */
 		return (1);
 
-	entries = realloc(list->items, sizeof(t_directory_entry) * new_capacity);
+	entries = realloc(directory_list->items, sizeof(t_directory_entry) * new_capacity);
 	if (!entries)
 		return (1);
 
-	list->items = entries;
-	list->capacity = new_capacity;
+	directory_list->items = entries;
+	directory_list->capacity = new_capacity;
 	return (0);
 }
 
@@ -109,31 +114,35 @@ static int	ensure_capacity(t_directory_list *list)
  * 0: entrada almacenada
  * 1: error fatal de memoria
  */
-int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *list) 
+int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *directory_list) 
 {
-	if (ensure_capacity(list) == 1)																			/* reservar o ampliar solo cuando el array esté vacio o lleno */
+	t_directory_entry	*directory_entry;
+
+	if (ensure_capacity(directory_list) == 1)																			/* reservar o ampliar solo cuando el array esté vacio o lleno */
 	{
 		ctx->fatal = FATAL_NOMEM;
 		return (1);
 	}
 
-	list->items[list->count].name = strdup(name_entry);														/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
-	if (!list->items[list->count].name)
+	directory_entry = &directory_list->items[directory_list->count];
+
+	directory_entry->name = strdup(name_entry);												/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
+	if (!directory_entry->name)
 	{
 		ctx->fatal = FATAL_NOMEM;
 		return (1);
 	}
 
-	list->items[list->count].stat_ok = 0;																	/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
+	directory_entry->stat_ok = 0;															/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
 	if (ctx->opts.l || ctx->opts.t || ctx->opts.big_r)
 	{
-		if (load_stat(ctx, name_directory, &list->items[list->count]) == 1)
+		if (load_stat(ctx, name_directory, directory_entry) == 1)
 		{
-			free(list->items[list->count].name);
+			free(directory_entry->name);
 			return (1);
 		}
 	}
 
-	list->count++;
+	directory_list->count++;
 	return (0);
 }

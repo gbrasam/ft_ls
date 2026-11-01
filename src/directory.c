@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/29 17:25:10 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 13:20:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,23 +64,23 @@ static DIR	*open_directory(t_ctx *ctx, const char *name)
  * entry->d_name[0] es el primer carácter de esa cadena
  *
  */
-static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_list *list)
+static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_list *directory_list)
 {
 	struct dirent	*entry;
 
 	errno = 0;
 	entry = readdir(dir);
-	while (entry)																	/* lee las entradas del directorio una a una hasta que readdir() devuelve NULL (no quedan entradas o hay un error) */
+	while (entry)																									/* lee las entradas del directorio una a una hasta que readdir() devuelve NULL (no quedan entradas o hay un error) */
 	{
-		if (ctx->opts.a || entry->d_name[0] != '.')									/* aplicar filtro -a */
+		if (ctx->opts.a || entry->d_name[0] != '.')																	/* aplicar filtro -a */
 		{
-			if (store_entry(ctx, name, entry->d_name, list) == 1)					/* guardar entradas válidas */
+			if (store_entry(ctx, name, entry->d_name, directory_list) == 1)											/* guardar entradas válidas */
 				return (1);
 		}
 		errno = 0;
 		entry = readdir(dir);
 	}
-	if (errno != 0)																	/* error de lectura */
+	if (errno != 0)																									/* error de lectura */
 	{
 		fprintf(stderr, "%s: reading directory '%s': %s\n",
 			ctx->prog, name, strerror(errno));
@@ -90,21 +90,62 @@ static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_li
 	return (0);
 }
 
+/* ------------------------------------------ handle_directory_entries ------------------------------------------ */
 
-/**
- * PROVISIONAL hasta Etapa 5
- */
-static void	print_entries(const t_directory_list *list)
+static void	prepare_entries_widths(t_directory_list *directory_list, t_print_widths *widths)
+{
+	(void)directory_list;
+	(void)widths;
+}
+
+
+static void	print_entries(t_ctx *ctx, const t_directory_list *directory_list, const t_print_widths *widths)
 {
 	size_t	i;
 
+	/*
+ 	 * Preparación del listado en formato largo (-l):
+ 	 * 1. Inicializar los anchos de columna para este directorio.
+ 	 * 2. Recorrer las entradas que se van a mostrar y cuyos metadatos
+ 	 *    sean válidos (stat_ok == 1), actualizando los anchos máximos.
+ 	 * 3. Calcular e imprimir el total de bloques del directorio.
+ 	 *
+ 	 * Las entradas con stat_ok == 0 no deben utilizarse para calcular
+ 	 * los anchos ni el total, aunque permanezcan en la lista.
+ 	 *
+ 	 * Cada directorio tiene sus propios anchos de columna y total de
+ 	 * bloques, que deben calcularse antes de imprimir sus entradas.
+ 	*/
+
 	i = 0;
-	while (i < list->count)
+	while (i < directory_list->count)
 	{
-		printf("%s\n", list->items[i].name);
+		if (ctx->opts.l)
+		{
+			if (directory_list->items[i].stat_ok)
+				print_long_format(directory_list->items[i].name, &directory_list->items[i].st, widths);
+		}
+		else
+			printf("%s\n", directory_list->items[i].name);
 		i++;
 	}
 }
+
+/*
+ * TODO: Para -l, distinguir entre el nombre mostrado (clean.c)
+ * y la ruta completa (src/clean.c), necesaria para readlink().
+ * Inicializar los anchos.
+ * Preparar los datos si está activado -l.
+ * Imprimir el total de bloques.
+ * Llamar a print_entries().
+ */
+static void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_list)
+{
+	(void)ctx;
+	(void)directory_list;
+}
+
+/* -------------------------------------------------------------------------------------------------------------- */
 
 /**
  * LIST_DIRECTORY — Abrir, leer y procesar el contenido de un directorio
@@ -315,7 +356,7 @@ static void	print_entries(const t_directory_list *list)
 void	list_directory(t_ctx *ctx, const char *path)
 {
 	DIR					*dir;
-	t_directory_list	list;
+	t_directory_list	directory_list;
 	int					flag_read;
 
 	/*
@@ -387,8 +428,8 @@ void	list_directory(t_ctx *ctx, const char *path)
 	dir = open_directory(ctx, path);
 	if (!dir)
 		return ;
-	init_directory_list(&list);
-	flag_read = read_directory(ctx, path, dir, &list);
+	init_directory_list(&directory_list);
+	flag_read = read_directory(ctx, path, dir, &directory_list);
 	/*
 	 * ¡! ETAPA 8: distinguir errores de lectura y errores de memoria
 	 *
@@ -449,9 +490,9 @@ void	list_directory(t_ctx *ctx, const char *path)
 	}
 	if (flag_read == 0)
 	{
-		sort_directory_entries(ctx, &list);
-		print_entries(&list);
+		sort_directory_entries(ctx, &directory_list);
+		print_entries(ctx, &directory_list);
         /* TODO: Recursividad -R (pendiente) */
 	}
-	clean_directory_list(&list);
+	clean_directory_list(&directory_list);
 }
