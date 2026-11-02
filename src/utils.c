@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 13:39:11 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/29 14:55:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 17:05:58 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,4 +52,3 @@ char	*build_path(const char *name_directory, const char *name_entry)
 	snprintf(path, size, "%s%s%s", name_directory, delimiter, name_entry);
 	return (path);
 }
-

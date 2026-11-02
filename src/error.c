@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:08:11 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/10 11:10:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/02 12:35:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,6 +44,8 @@ void	report_fatal(t_ctx *ctx)
 	}
 	else if (ctx->fatal == FATAL_NOMEM)
 		fprintf(stderr, "%s: memory exhausted\n", ctx->prog);
+	else if (ctx->fatal == FATAL_CLOCK)
+		fprintf(stderr, "%s: clock_gettime: %s\n", ctx->prog, strerror(ctx->error_errno));
 	/*
 	else if (ctx->fatal == FATAL_WRITE)
 	{

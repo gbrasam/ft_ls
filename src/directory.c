@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/01 13:20:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 18:30:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,38 +92,33 @@ static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_li
 
 /* ------------------------------------------ handle_directory_entries ------------------------------------------ */
 
-static void	prepare_entries_widths(t_directory_list *directory_list, t_print_widths *widths)
+static void	prepare_entries_widths(const t_directory_list *directory_list, t_print_widths *widths)
 {
 	(void)directory_list;
 	(void)widths;
 }
 
 
-static void	print_entries(t_ctx *ctx, const t_directory_list *directory_list, const t_print_widths *widths)
+static void	print_directory_entries(t_ctx *ctx, const t_directory_list *directory_list, const t_print_widths *widths)
 {
 	size_t	i;
-
-	/*
- 	 * Preparación del listado en formato largo (-l):
- 	 * 1. Inicializar los anchos de columna para este directorio.
- 	 * 2. Recorrer las entradas que se van a mostrar y cuyos metadatos
- 	 *    sean válidos (stat_ok == 1), actualizando los anchos máximos.
- 	 * 3. Calcular e imprimir el total de bloques del directorio.
- 	 *
- 	 * Las entradas con stat_ok == 0 no deben utilizarse para calcular
- 	 * los anchos ni el total, aunque permanezcan en la lista.
- 	 *
- 	 * Cada directorio tiene sus propios anchos de columna y total de
- 	 * bloques, que deben calcularse antes de imprimir sus entradas.
- 	*/
 
 	i = 0;
 	while (i < directory_list->count)
 	{
 		if (ctx->opts.l)
 		{
+			/*
+			* TODO paso 8: imprimir las entradas con stat_ok == 0
+			*/
 			if (directory_list->items[i].stat_ok)
-				print_long_format(directory_list->items[i].name, &directory_list->items[i].st, widths);
+			{
+				/*
+				* TODO paso 7: construir la ruta completa de los enlaces
+				* simbólicos para readlink() y liberar la memoria reservada
+				*/
+				print_long_format(ctx, directory_list->items[i].name, NULL, &directory_list->items[i].st, widths);
+			}
 		}
 		else
 			printf("%s\n", directory_list->items[i].name);
@@ -132,17 +127,24 @@ static void	print_entries(t_ctx *ctx, const t_directory_list *directory_list, co
 }
 
 /*
- * TODO: Para -l, distinguir entre el nombre mostrado (clean.c)
- * y la ruta completa (src/clean.c), necesaria para readlink().
- * Inicializar los anchos.
- * Preparar los datos si está activado -l.
- * Imprimir el total de bloques.
- * Llamar a print_entries().
+ * Coordina la preparación e impresión de las entradas del directorio
+ *
+ * Con -l:
+ * 1. Inicializa los anchos de las columnas
+ * 2. Calcula los anchos máximos de las entradas con stat_ok == 1
+ * 3. TODO paso 5: calcular e imprimir el total de bloques
+ * 4. Imprime las entradas en formato largo
+ *
+ * Cada directorio tiene sus propios anchos y total de bloques
  */
 static void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_list)
 {
-	(void)ctx;
-	(void)directory_list;
+	t_print_widths	widths;
+
+	init_print_widths(&widths);
+	if (ctx->opts.l)
+		prepare_entries_widths(directory_list, &widths);
+	print_directory_entries(ctx, directory_list, &widths);
 }
 
 /* -------------------------------------------------------------------------------------------------------------- */
@@ -155,29 +157,22 @@ static void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_lis
  *    #include <dirent.h>
  *    DIR *opendir(const char *name);
  *
- *    - name: ruta del directorio que queremos abrir.
- *      En nuestro caso: path.
+ *    - name: ruta del directorio que queremos abrir (path).
+ *    - DIR *: puntero que permite gestionar su lectura.
  *
- *    - DIR *: puntero al objeto que gestiona la lectura del directorio.
- *      Lo guardamos en una variable:
+ *    En nuestro programa:
  *
- *          DIR *dir;
- *          dir = opendir(path);
+ *        DIR *dir;
+ *        dir = open_directory(ctx, path);
  *
- *    - Si tiene éxito, devuelve un puntero DIR *.
- *    - Si falla, devuelve NULL y establece errno.
- *      Ejemplos: directorio inexistente o permisos insuficientes.
+ *    open_directory() utiliza opendir() y gestiona los errores.
+ *
+ *    - Éxito: devuelve un puntero DIR *.
+ *    - Error: devuelve NULL y establece errno.
  *
  *    IMPORTANTE:
- *    opendir() NO devuelve los nombres de los archivos.
- *    Solo abre el directorio y prepara su lectura.
- *
- *    Diferencia:
- *    - path: cadena con la ruta del directorio.
- *    - dir: puntero que permite leer ese directorio.
- *
- *    En nuestro programa, la apertura se realiza mediante
- *    open_directory(), que también gestiona los errores.
+ *    opendir() abre el directorio, pero no devuelve sus entradas.
+ *    Para obtenerlas necesitamos readdir().
  *
  *
  * 2. LEER LAS ENTRADAS: readdir()
@@ -185,73 +180,75 @@ static void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_lis
  *    #include <dirent.h>
  *    struct dirent *readdir(DIR *dirp);
  *
- *    - dirp: puntero DIR * obtenido mediante opendir().
- *    - Devuelve un puntero struct dirent * a la siguiente entrada.
- *    - Devuelve NULL cuando no quedan entradas o hay un error.
+ *    - Recibe el puntero DIR * obtenido mediante opendir().
+ *    - Devuelve un puntero a la siguiente entrada del directorio.
+ *    - Devuelve NULL al finalizar o cuando se produce un error.
  *
- *    Para guardar el resultado:
+ *    Ejemplo:
  *
  *        struct dirent *entry;
  *        entry = readdir(dir);
  *
- *    Para consultar el nombre:
+ *    El nombre de la entrada se obtiene mediante:
  *
  *        entry->d_name
  *
  *    IMPORTANTE:
- *    Comprobar que entry != NULL antes de acceder a d_name.
+ *    Comprobar que entry != NULL antes de acceder a sus campos.
  *
- *    Un directorio puede contener muchas entradas.
- *    Debemos llamar repetidamente a readdir() hasta recibir NULL.
+ *    Para distinguir el final de la lectura de un error:
  *
- *    Para distinguir fin de lectura de error:
- *    - errno == 0: fin del directorio.
- *    - errno != 0: error de lectura.
- *
- *    Debemos poner errno = 0 antes de la llamada a readdir()
- *    cuyo resultado NULL vamos a comprobar.
+ *    - errno = 0 antes de llamar a readdir().
+ *    - NULL y errno == 0: fin normal.
+ *    - NULL y errno != 0: error de lectura.
  *
  *    ATENCIÓN:
- *    Guardar entry NO significa conservar todas las entradas.
- *    readdir() puede reutilizar su memoria en llamadas posteriores.
+ *    readdir() puede reutilizar la memoria de la entrada devuelta.
+ *    Por eso no conservamos directamente entry->d_name.
  *
- *    Para conservar los nombres, debemos copiarlos mediante
- *    strdup() y almacenarlos en una colección propia:
+ *    store_entry() utiliza strdup() para copiar el nombre
+ *    y almacenarlo en nuestra propia t_directory_list.
  *
- *        t_directory_list list;
- *
- *    En nuestro programa, read_directory() realiza la lectura
- *    y utiliza store_entry() para almacenar cada entrada.
+ *    read_directory() se encarga de recorrer las entradas,
+ *    filtrarlas y almacenarlas mediante store_entry().
  *
  *
- * 3. PROCESAR Y ALMACENAR LAS ENTRADAS
+ * 3. ALMACENAR LAS ENTRADAS Y OBTENER SUS METADATOS
  *
  *    IMPLEMENTADO:
+ *
  *    - Filtrar nombres ocultos según la opción -a.
- *    - Almacenar las entradas en t_directory_list mediante
- *      store_entry().
- *    - Copiar los nombres con strdup(), porque la memoria
- *      devuelta por readdir() no debe conservarse directamente.
- *    - Obtener metadatos mediante store_entry() -> load_stat(),
- *      cuando están activadas las opciones -l, -t o -R.
- *    - Guardar los metadatos en cada t_directory_entry.
- *    - Utilizar stat_ok para indicar si son válidos.
+ *    - Almacenar las entradas en t_directory_list.
+ *    - Copiar sus nombres mediante strdup().
+ *    - Obtener metadatos mediante store_entry() -> load_stat()
+ *      cuando están activadas -l, -t o -R.
+ *    - Guardar los metadatos en t_directory_entry.st.
+ *    - Utilizar stat_ok para indicar si lstat() tuvo éxito.
  *
- *    PENDIENTE:
- *    - ETAPA 4: ordenar las entradas por nombre o fecha (-t),
- *      considerando también la opción -r.
- *    - ETAPA 5: implementar la presentación detallada con -l.
- *    - ETAPA 7: descender a subdirectorios cuando se active -R.
+ *    load_stat() utiliza lstat() sobre la ruta completa:
  *
- *    IMPORTANTE PARA -R:
- *    Primero procesamos y mostramos el directorio actual.
- *    Después descendemos a sus subdirectorios.
+ *        ruta_directorio + "/" + nombre_entrada
  *
- *    Nunca debemos descender a "." ni a "..".
+ *    Ejemplo:
  *
- *    Los metadatos obtenidos mediante lstat() permiten
- *    distinguir un directorio real de un enlace simbólico
- *    que apunta a un directorio.
+ *        path:       "src"
+ *        name:       "main.c"
+ *        ruta real:  "src/main.c"
+ *
+ *    IMPORTANTE:
+ *    lstat() obtiene información del propio enlace simbólico,
+ *    sin seguirlo hasta su destino.
+ *
+ *    Esto permite distinguir archivos, directorios y enlaces
+ *    simbólicos mediante st_mode.
+ *
+ *    Si lstat() falla de forma recuperable:
+ *
+ *    - stat_ok permanece en 0.
+ *    - Se informa del error y se actualiza ctx->status.
+ *    - La entrada puede permanecer almacenada en la lista.
+ *
+ *    Un error fatal de memoria se registra en ctx->fatal.
  *
  *
  * 4. CERRAR EL DIRECTORIO: closedir()
@@ -260,62 +257,223 @@ static void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_lis
  *    int closedir(DIR *dirp);
  *
  *    - Cierra el directorio abierto mediante opendir().
- *    - Devuelve 0 si tiene éxito y -1 si falla (establece errno).
- *    - Después de cerrarlo, no debemos volver a utilizar dir.
+ *    - Devuelve 0 si tiene éxito.
+ *    - Devuelve -1 si falla y establece errno.
  *
- *    ORDEN ACTUAL:
+ *    En nuestro programa cerramos el directorio después
+ *    de leer las entradas y antes de ordenarlas e imprimirlas.
  *
- *    1. open_directory()       -> abrir el directorio.
- *    2. init_directory_list()  -> inicializar la lista.
- *    3. read_directory()       -> leer y almacenar entradas.
- *    4. closedir()             -> cerrar el directorio.
- *    5. sort_directory_entries() -> ordenar las entradas.
- *    6. print_entries()        -> imprimir las entradas.
- *    7. Recursividad -R        -> pendiente.
- *    8. clean_directory_list() -> liberar la memoria.
+ *    Esto es posible porque ya hemos conservado sus nombres
+ *    y los metadatos necesarios en nuestra propia lista.
  *
  *    IMPORTANTE:
- *    Cerramos el directorio ANTES de ordenar e imprimir.
+ *    closedir() también debe ejecutarse si read_directory()
+ *    falla, siempre que opendir() haya tenido éxito.
  *
- *    Esto es posible porque ya hemos copiado los nombres
- *    y, cuando es necesario, los metadatos de las entradas.
- *
- *    Con -R evitaremos mantener abiertos simultáneamente
- *    los directorios de los distintos niveles del recorrido.
- *
- *    closedir() también debe ejecutarse cuando read_directory()
- *    falla, siempre que opendir() haya funcionado.
+ *    Para la futura opción -R, cerrar antes de descender
+ *    evita mantener abiertos simultáneamente los directorios
+ *    de los distintos niveles.
  *
  *
- * 5. LIBERAR LA MEMORIA: clean_directory_list()
+ * 5. ORDENAR LAS ENTRADAS — ETAPA 4 TERMINADA
  *
- *    Después de procesar las entradas, liberamos la memoria
- *    reservada para nuestra lista.
+ *    sort_directory_entries() ordena las entradas almacenadas
+ *    antes de imprimirlas.
  *
- *    clean_directory_list() debe liberar:
- *    - Cada nombre copiado mediante strdup().
+ *    Comportamiento:
+ *
+ *    - Sin -t: orden alfabético por nombre.
+ *    - Con -t: orden por fecha de modificación, más reciente
+ *      primero.
+ *    - Con -r: invertir el orden resultante.
+ *
+ *    La ordenación se realiza mediante qsort().
+ *
+ *    Para -t se utilizan los metadatos obtenidos mediante
+ *    lstat(), especialmente:
+ *
+ *        st.st_mtim.tv_sec
+ *        st.st_mtim.tv_nsec
+ *
+ *    Se comparan segundos y nanosegundos para conservar
+ *    la precisión temporal.
+ *
+ *    En caso de igualdad de fecha, se desempata por nombre.
+ *
+ *    Las entradas con stat_ok == 0 se consideran al ordenar:
+ *    las válidas preceden a las inválidas en el orden base.
+ *
+ *    IMPORTANTE:
+ *    La inversión -r se aplica después de la ordenación,
+ *    por lo que afecta también al orden de los desempates.
+ *
+ *    La ordenación no modifica los nombres ni los metadatos:
+ *    únicamente reorganiza las estructuras dentro del array.
+ *
+ *
+ * 6. PREPARAR E IMPRIMIR LAS ENTRADAS — ETAPA 5 (-l)
+ *
+ *    handle_directory_entries() coordina la presentación
+ *    del contenido del directorio.
+ *
+ *    Flujo:
+ *
+ *    1. Inicializar los anchos de columna:
+ *
+ *        init_print_widths(&widths);
+ *
+ *    2. Si está activado -l:
+ *
+ *        prepare_entries_widths(directory_list, &widths);
+ *
+ *    3. Imprimir las entradas:
+ *
+ *        print_directory_entries(ctx, directory_list, &widths);
+ *
+ *    PREPARACIÓN DE ANCHOS:
+ *
+ *    Cada directorio tiene sus propios anchos máximos.
+ *
+ *    prepare_entries_widths() recorre las entradas visibles
+ *    con metadatos válidos (stat_ok == 1).
+ *
+ *    Para cada entrada utiliza update_print_widths(),
+ *    que actualiza los máximos de:
+ *
+ *        widths.nlink  -> número de enlaces físicos.
+ *        widths.owner  -> nombre del propietario.
+ *        widths.group  -> nombre del grupo.
+ *        widths.size   -> tamaño mostrado.
+ *
+ *    Los anchos representan caracteres de salida, no bytes
+ *    ocupados por las variables en memoria.
+ *
+ *    FORMATO LARGO:
+ *
+ *    print_long_format() presenta los campos:
+ *
+ *    - Tipo de archivo y permisos (st_mode).
+ *    - Número de enlaces físicos (st_nlink).
+ *    - Propietario (st_uid -> getpwuid()).
+ *    - Grupo (st_gid -> getgrgid()).
+ *    - Tamaño (st_size).
+ *    - Fecha de modificación (st_mtim).
+ *    - Nombre de la entrada.
+ *
+ *    Los campos variables se alinean utilizando los anchos
+ *    máximos calculados previamente.
+ *
+ *    Para los identificadores de propietario y grupo debe
+ *    contemplarse una representación numérica si no se
+ *    encuentra el nombre correspondiente.
+ *
+ *    ENLACES SIMBÓLICOS:
+ *
+ *    En formato largo se muestra:
+ *
+ *        nombre -> destino
+ *
+ *    El destino se obtiene mediante readlink().
+ *
+ *    Debemos distinguir:
+ *
+ *    - Nombre mostrado: "enlace".
+ *    - Ruta completa: "src/enlace".
+ *
+ *    readlink() necesita la ruta completa del enlace.
+ *    El nombre mostrado no debe incluir necesariamente
+ *    la ruta del directorio.
+ *
+ *    FECHAS:
+ *
+ *    La presentación de st_mtim depende de su antigüedad
+ *    respecto a una referencia temporal común.
+ *
+ *    Se utilizará ctx->now, inicializada una sola vez,
+ *    para aplicar coherentemente la regla de los seis meses.
+ *
+ *    TOTAL DE BLOQUES:
+ *
+ *    Con -l, antes de imprimir las entradas del directorio,
+ *    se muestra:
+ *
+ *        total N
+ *
+ *    El total se calcula a partir de st_blocks de las
+ *    entradas incluidas en el listado y con stat_ok válido.
+ *
+ *    st_blocks expresa normalmente bloques de 512 bytes.
+ *    La conversión a las unidades mostradas debe respetar
+ *    el comportamiento de referencia de ls.
+ *
+ *    El total no representa el número de archivos ni
+ *    la suma de sus tamaños st_size.
+ *
+ *    IMPORTANTE:
+ *    El total corresponde al contenido de cada directorio.
+ *    No se imprime un total para los operandos OPS_FILE
+ *    mostrados individualmente.
+ *
+ *    ENTRADAS SIN METADATOS VÁLIDOS:
+ *
+ *    Si -l está activado y stat_ok == 0, la implementación
+ *    prevista omite la impresión detallada de esa entrada.
+ *
+ *    Estas entradas tampoco contribuyen a los anchos
+ *    máximos ni al total de bloques.
+ *
+ *    Sin -l, print_directory_entries() imprime los nombres
+ *    de las entradas seleccionadas.
+ *
+ *
+ * 7. RECORRIDO RECURSIVO — ETAPA 7 PENDIENTE
+ *
+ *    Cuando se implemente -R:
+ *
+ *    1. Procesar y mostrar el directorio actual.
+ *    2. Identificar sus subdirectorios reales.
+ *    3. Descender recursivamente a cada subdirectorio.
+ *
+ *    Nunca debemos descender a "." ni a "..".
+ *
+ *    Los metadatos obtenidos mediante lstat() permiten
+ *    evitar confundir enlaces simbólicos con directorios.
+ *
+ *    PENDIENTE:
+ *    Distinguir directorios recibidos como operandos argv
+ *    de los descubiertos durante el recorrido recursivo.
+ *
+ *    Esta distinción puede afectar al tratamiento
+ *    y gravedad de determinados errores.
+ *
+ *
+ * 8. LIBERAR LA MEMORIA: clean_directory_list()
+ *
+ *    Después de procesar las entradas, liberamos:
+ *
+ *    - Cada nombre reservado mediante strdup().
  *    - El array dinámico de t_directory_entry.
  *
  *    No debemos confundir dos recursos diferentes:
  *
  *    - DIR *dir:
- *      Recurso gestionado mediante opendir() y closedir().
+ *      Gestionado mediante opendir() y closedir().
  *
- *    - t_directory_list list:
+ *    - t_directory_list:
  *      Memoria dinámica gestionada mediante store_entry()
  *      y clean_directory_list().
  *
- *    Cerrar dir NO libera automáticamente nuestra lista.
- *    Liberar la lista NO cierra el directorio.
+ *    Cerrar DIR * no libera nuestra lista.
+ *    Liberar nuestra lista no cierra DIR *.
  *
- *    Si open_directory() falla, no se ha inicializado la lista
- *    y la función retorna directamente.
+ *    Si open_directory() falla, retornamos directamente
+ *    sin inicializar la lista.
  *
  *    Si read_directory() falla después de inicializarla,
- *    debemos cerrar dir y liberar la memoria almacenada.
+ *    debemos cerrar DIR * y liberar la memoria almacenada.
  *
  *
- * 6. TRATAMIENTO DE ERRORES
+ * 9. TRATAMIENTO DE ERRORES — ETAPA 8 PENDIENTE
  *
  *    ctx->status:
  *    Representa el código de salida global del programa.
@@ -324,34 +482,38 @@ static void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_lis
  *    - 1: errores menores durante el procesamiento.
  *    - 2: errores de mayor gravedad.
  *
- *    Un error recuperable no implica necesariamente
- *    detener el programa: podemos informar por stderr
- *    y continuar con otros operandos o directorios.
+ *    Un error recuperable puede permitir continuar
+ *    procesando otros archivos o directorios.
  *
  *    ctx->fatal:
- *    Indica si se ha producido un error que impide
- *    continuar con el procesamiento normal.
+ *    Indica un error que impide continuar normalmente.
  *
- *    Por ejemplo:
- *    - FATAL_NOMEM: fallo de reserva de memoria.
+ *    Ejemplo:
+ *
+ *        FATAL_NOMEM
  *
  *    IMPORTANTE:
  *    ctx->status y ctx->fatal tienen responsabilidades
  *    diferentes y no deben confundirse.
  *
- *    PENDIENTE ETAPA 7 (-R):
- *    Distinguir los errores de directorios recibidos como
- *    operandos de argv de los errores de subdirectorios
- *    descubiertos durante el recorrido recursivo.
+ *    PENDIENTE:
  *
- *    PENDIENTE ETAPA 8:
- *    - Distinguir un fallo recuperable de readdir()
- *      de un fallo fatal de memoria.
- *    - Aprovechar ctx->fatal para identificar el fallo
- *      de memoria sin añadir otro código de retorno.
- *    - Verificar frente a GNU ls el código de salida
- *      correspondiente a errores de closedir().
- *    - Revisar la gestión de errores de escritura.
+ *    - Distinguir errores recuperables de readdir()
+ *      de errores fatales de memoria.
+ *    - Utilizar ctx->fatal para identificar los errores
+ *      de memoria sin añadir códigos de retorno innecesarios.
+ *    - Verificar los códigos de salida frente a GNU ls.
+ *    - Revisar los errores de closedir().
+ *    - Revisar los errores de escritura.
+ *    - Evitar sobrescribir un status de mayor gravedad
+ *      con otro de menor gravedad.
+ *
+ *    IMPORTANTE:
+ *    Actualmente la ordenación y la impresión se ejecutan
+ *    cuando read_directory() devuelve 0.
+ *
+ *    La gestión diferenciada de errores recuperables y
+ *    fatales queda pendiente de la etapa 8.
  */
 void	list_directory(t_ctx *ctx, const char *path)
 {
@@ -491,7 +653,7 @@ void	list_directory(t_ctx *ctx, const char *path)
 	if (flag_read == 0)
 	{
 		sort_directory_entries(ctx, &directory_list);
-		print_entries(ctx, &directory_list);
+		handle_directory_entries(ctx, &directory_list);
         /* TODO: Recursividad -R (pendiente) */
 	}
 	clean_directory_list(&directory_list);

@@ -6,13 +6,13 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/01 13:20:00 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/02 12:35:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
-/* ------------------------------------------------ handle_error ------------------------------------------------ */
+/* ----------------------------------------------------------- handle_error ----------------------------------------------------------- */
 
 /*
  * Gestiona los operandos clasificados como OPS_ERROR.
@@ -52,14 +52,21 @@ static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 	}
 }
 
-/* ------------------------------------------------ handle_files ------------------------------------------------ */
+/* ----------------------------------------------------------- handle_files ----------------------------------------------------------- */
 
-static void	prepare_files_widths(t_operand_list *operand_list, t_print_widths *widths)
+static void	prepare_files_widths(const t_operand_list *operand_list, t_print_widths *widths)
 {
 	(void)operand_list;
 	(void)widths;
+
+	/* prepare_files_widths: debe contar solo OPS_FILE,
+	porque el array también contiene directorios y errores,
+	y estos últimos tienen st inválido */
 }
 
+/*
+ * en los operandos, 'name' es tanto el nombre mostrado como la ruta del archivo
+ */
 static void	print_files(t_ctx *ctx, const t_operand_list *operand_list, const t_print_widths *widths)
 {
 	size_t	i;
@@ -70,7 +77,7 @@ static void	print_files(t_ctx *ctx, const t_operand_list *operand_list, const t_
 		if (operand_list->items[i].kind == OPS_FILE)
 		{
 			if (ctx->opts.l)
-				print_long_format(operand_list->items[i].name, &operand_list->items[i].st, widths);
+				print_long_format(ctx, operand_list->items[i].name, operand_list->items[i].name, &operand_list->items[i].st, widths);
 			else
 				fprintf(stdout, "%s\n", operand_list->items[i].name);
 		}
@@ -88,7 +95,7 @@ static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
 	print_files(ctx, operand_list, &widths);
 }
 
-/* --------------------------------------------- handle_directories --------------------------------------------- */
+/* -------------------------------------------------------- handle_directories -------------------------------------------------------- */
 
 static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 {
@@ -119,6 +126,9 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list)
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	handle_error(ctx, operand_list);
+	if (ctx->fatal != FATAL_NONE)
+		return ;
+	init_long_format_time(ctx);												/* inicializa ctx->now (clock_gettime()) solo si está activada la opción -l */
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	sort_operands(ctx, operand_list);

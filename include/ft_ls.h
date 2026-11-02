@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/01 13:10:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/02 12:40:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,25 +54,49 @@ typedef enum e_operand_kind
 }	t_operand_kind;
 
 /**
- * t_fatal representa los errores que obligan a detener el procesamiento.
+ * t_fatal identifica los errores que obligan a detener el procesamiento.
  *
  * FATAL_NONE   (=0) -> no hay error fatal
  * FATAL_OPTION (=1) -> opción de línea de comandos no válida
  * FATAL_NOMEM  (=2) -> fallo al reservar memoria dinámica
- * FATAL_WRITE  (=3) -> fallo al escribir la salida
+ * FATAL_CLOCK  (=3) -> fallo al consultar el reloj del sistema
+ * FATAL_WRITE  (=4) -> fallo al escribir la salida (pendiente de implementar)
  *
- * IMPORTANTE: un error recuperable no significa que el error pueda
- * solucionarse. Significa que el error ha ocurrido, pero el programa
- * puede continuar realizando el resto del trabajo.
+ * DIFERENCIA ENTRE ERRORES RECUPERABLES Y FATALES
  *
- * Error recuperable -> permite continuar el procesamiento.
- * Error fatal       -> obliga a detener el procesamiento.
+ * Error recuperable:
+ * - El error ha ocurrido, pero podemos continuar procesando.
+ * - No establece ctx->fatal.
+ * - Actualiza ctx->status según su gravedad (1 o 2).
+ *
+ * Ejemplos:
+ * - lstat() falla sobre una entrada encontrada con readdir():
+ *   status = 1; continuamos con las demás entradas.
+ * - Un operando de argv no existe:
+ *   status = 2; continuamos con los demás operandos.
+ *
+ * Error fatal:
+ * - Impide continuar el procesamiento normal.
+ * - Establece ctx->fatal con la causa del error.
+ * - report_fatal() establece status = 2 y muestra el mensaje.
+ * - Fallo al consultar el reloj: FATAL_CLOCK.
+ *
+ * Ejemplos:
+ * - Opción no válida: FATAL_OPTION.
+ * - Fallo de memoria: FATAL_NOMEM.
+ * - Fallo al escribir la salida: FATAL_WRITE (pendiente).
+ *
+ * IMPORTANTE:
+ * status = 2 no implica necesariamente un error fatal.
+ * ctx->status indica la gravedad del error.
+ * ctx->fatal indica si debemos detenernos y por qué.
  */
 typedef enum e_fatal
 {
 	FATAL_NONE,
 	FATAL_OPTION,
 	FATAL_NOMEM,
+	FATAL_CLOCK,
 	FATAL_WRITE
 }	t_fatal;
 
@@ -117,7 +141,10 @@ typedef struct s_opts
  * printed  indica si ya hemos impreso algo anteriormente
  * headers  indica si debemos imprimir el nombre del directorio como cabecera
  * fatal    indica si ha ocurrido un error que obliga a detenerse
- * now      hora de referencia (se usará con -l)
+ * now      fecha y hora actual de referencia (struct timespec).
+ *          Se inicializa una sola vez en init_long_format_time(),
+ *          únicamente con -l, para decidir cómo mostrar la fecha
+ *          de modificación de los archivos.
  *
  * IMPORTANTE: status = 2 no significa necesariamente error fatal.
  * Puede haber un error recuperable, establecer status = 2 y continuar
@@ -162,6 +189,7 @@ typedef struct s_ctx
 	int				printed;
 	int				headers;
 	t_fatal			fatal;
+	int				error_errno;									/* errno asociado al error fatal de la ejecución */
 	struct timespec	now;
 
 }	t_ctx;
@@ -170,7 +198,7 @@ typedef struct s_operand_info
 {
 	const char		*name;
 	t_operand_kind	kind;
-	int				err;											/* errno */
+	int				err;											/* errno asociado al error de este operando */
 	struct stat		st;
 	int				stat_ok;										/* flag 1: st válido; 0: stat() no llamado o fallido */
 }	t_operand_info;
@@ -305,7 +333,9 @@ typedef struct s_print_widths
 void	init_ctx(t_ctx *ctx, const char *prog);
 void	init_ops(t_operands *ops);
 void	init_operand_list(t_operand_list *operand_list);
+void	init_long_format_time(t_ctx *ctx);
 void	init_directory_list(t_directory_list *directory_list);
+void	init_print_widths(t_print_widths *print_widths);
 
 /* parser.c */
 int		parse_args(int argc, char **argv, t_ctx *ctx, t_operands *ops);
@@ -333,9 +363,9 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* long_format.c */
 /* fase 1: preparación del listado */
-void	update_print_widths(t_print_widths *widths, const struct stat *st);
+void	update_print_widths(const struct stat *st, t_print_widths *widths);
 /* fase 2: impresión del formato largo */
-void	print_long_format(const char *name, const struct stat *st, const t_print_widths *widths);
+void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);

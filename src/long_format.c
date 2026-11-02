@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/01 12:55:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/01 18:30:45 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,9 +35,10 @@
  * Por eso utilizamos size_t: cada campo almacena una cantidad
  * de caracteres, no el valor original del metadato.
  */
-void	update_print_widths(t_print_widths *widths, const struct stat *st)
+void	update_print_widths(const struct stat *st, t_print_widths *widths)
 {
-
+	(void)st;
+	(void)widths;
 }
 
 /*
@@ -65,10 +66,11 @@ void	update_print_widths(t_print_widths *widths, const struct stat *st)
  *	   En directory.c → print_entries() antes del bucle
  *	   En operands_handle.c → handle_files() antes del bucle
  */
-void	print_long_format(const char *name, const struct stat *st, const t_print_widths *widths)
+void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths)
 {
+	(void)ctx;
 	(void)name;
+	(void)path;
 	(void)st;
 	(void)widths;
-	/* TODO: definir interfaz definitiva */
 }
