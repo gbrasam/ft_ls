@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/02 12:40:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/02 16:50:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,10 @@
 #include <dirent.h>
 #include <stdint.h>
 #include <time.h>
+#include <sys/types.h>
+#include <pwd.h>													/* getpwuid() información de un usuario por su UID */
+#include <grp.h>													/* getgrgid() información de un grupo por su GID */
+#include <sys/sysmacros.h>											/* major() y minor() */
 
 /**
  * t_argkind representa la clase de argumento de la línea de comandos.
@@ -200,7 +204,7 @@ typedef struct s_operand_info
 	t_operand_kind	kind;
 	int				err;											/* errno asociado al error de este operando */
 	struct stat		st;
-	int				stat_ok;										/* flag 1: st válido; 0: stat() no llamado o fallido */
+	int				stat_ok;										/* 1: st válido; 0: lstat() no llamado o fallido */
 }	t_operand_info;
 
 typedef struct s_operand_list
@@ -231,34 +235,134 @@ typedef struct s_operands
 }	t_operands;
 
 /*
- * st: estructura donde se almacenan los metadatos del archivo
- * st_mode		tipo de archivo y permisos
- * st_size		tamaño en bytes
- * st_mtim		fecha y hora de última modificación, en Linux
- * st_uid		identificador del propietario
- * st_gid		identificador del grupo
- * st_nlink		número de enlaces duros
- * st_blocks	bloques de 512 bytes asignados
- * 
- * esta información será necesaria para implementar las opciones
- * -l: necesita permisos, propietario, grupo, tamaño, fecha, etc
- * -t: necesita la fecha de modificación para ordenar
- * -R: usa S_ISDIR(st.st_mode) de la entrada para decidir si desciende
+ * METADATOS DE UNA ENTRADA DE DIRECTORIO: struct stat
  *
- * rellenamos st mediante lstat()
- * lstat(path, &entry->st); path = build_path(directorio, entry->name), p. ej. "src/clean.c"
- * si lstat() tiene éxito, devuelve 0
- * si falla, devuelve -1 y establece errno
- * 
- * stat_ok: ¿hemos obtenido correctamente los metadatos?
- * flag stat_ok = 1: lstat() ha tenido éxito y st contiene datos válidos
- * flag stat_ok = 0: todavía no se han solicitado los metadatos o lstat() ha fallado
+ * st es una estructura que almacena los metadatos del archivo.
+ * Cuando una función recibe const struct stat *st, recibe
+ * un puntero a esa estructura y no puede modificarla a través de él.
+ *
+ * PRINCIPALES CAMPOS DE struct stat (LINUX)
+ *
+ * Tipo             Campo       Significado
+ * --------------------------------------------------------------
+ * mode_t           st_mode     Tipo de archivo y permisos.
+ * off_t            st_size     Tamaño lógico en bytes.
+ * struct timespec  st_mtim     Fecha y hora de última modificación
+ *                             (Linux).
+ * uid_t            st_uid      Identificador del propietario.
+ * gid_t            st_gid      Identificador del grupo.
+ * nlink_t          st_nlink    Número de enlaces duros.
+ * blkcnt_t         st_blocks   Bloques de 512 bytes asignados
+ *                             (Linux).
+ *
+ * TIPOS DE DATOS Y CÁLCULO DE DÍGITOS
+ *
+ * Aunque los campos tengan tipos diferentes, podemos utilizar
+ * una misma función para contar los dígitos de sus valores
+ * enteros no negativos, siempre que la conversión a size_t
+ * sea adecuada.
+ *
+ * st_size es de tipo off_t, normalmente con signo.
+ * Si su valor fuera negativo, habría que tratarlo expresamente
+ * antes de convertirlo a size_t.
+ *
+ * st_mtim es una estructura timespec, no un número entero.
+ * Su tratamiento es diferente al de los campos numéricos.
+ *
+ * DIFERENCIA ENTRE st_size Y st_blocks
+ *
+ * st_size:
+ * - Representa el tamaño lógico del archivo en bytes.
+ * - Se utiliza para calcular el ancho de la columna de tamaño
+ *   cuando se imprime el formato largo (-l).
+ *
+ * st_blocks:
+ * - Representa el espacio asignado en unidades de 512 bytes
+ *   en Linux.
+ * - Se utilizará posteriormente para calcular el total
+ *   que aparece al listar directorios con -l.
+ *
+ * Ejemplo:
+ * Un archivo puede tener:
+ * - st_size = 1000 bytes.
+ * - st_blocks = 8 bloques de 512 bytes = 4096 bytes asignados.
+ *
+ * UTILIZACIÓN DE LOS METADATOS EN ft_ls
+ *
+ * -l: utiliza el tipo de archivo, permisos, número de enlaces,
+ *     propietario, grupo, tamaño y fecha de modificación
+ *     para imprimir el formato largo.
+ *
+ * -t: utiliza st_mtim para ordenar los archivos según
+ *     su fecha y hora de última modificación.
+ *
+ * -R: utiliza S_ISDIR(st.st_mode) para identificar directorios
+ *     y decidir si debe descender recursivamente, teniendo
+ *     en cuenta las reglas de seguimiento de enlaces simbólicos.
+ *
+ * OBTENCIÓN DE LOS METADATOS: lstat()
+ *
+ * Los metadatos de cada entrada se obtienen mediante lstat().
+ *
+ * lstat(const char *path, struct stat *buf):
+ * - path: ruta completa de la entrada que queremos consultar.
+ * - buf: dirección de la estructura donde guardar los metadatos.
+ * - Devuelve 0 si tiene éxito.
+ * - Devuelve -1 si falla y establece errno.
+ *
+ * Para consultar una entrada de un directorio, construimos
+ * su ruta completa mediante build_path().
+ *
+ * Ejemplo:
+ * - Directorio: "src"
+ * - Nombre de la entrada: "clean.c"
+ * - Ruta construida: "src/clean.c"
+ *
+ * path = build_path(directorio, entry->name);
+ * lstat(path, &entry->st);
+ *
+ * IMPORTANTE:
+ * - lstat() consulta los metadatos del propio archivo.
+ * - Si la entrada es un enlace simbólico, no sigue el enlace
+ *   hasta su destino.
+ * - Si lstat() funciona, entry->st contiene los metadatos
+ *   del propio enlace simbólico, no los de su destino.
+ * - La memoria reservada por build_path() debe liberarse
+ *   mediante free(path) cuando ya no se necesite.
+ *
+ * DIFERENCIA ENTRE LAS ENTRADAS Y LOS OPERANDOS
+ *
+ * Las entradas de directorio se consultan mediante lstat().
+ *
+ * Los operandos recibidos por argv tienen una clasificación
+ * diferente, implementada en get_operand_info(), que utiliza
+ * stat() y lstat() según el caso.
+ *
+ * Por tanto, no debemos confundir la obtención de metadatos
+ * de una entrada con la clasificación de los operandos.
+ *
+ * VALIDEZ DE LOS METADATOS: stat_ok
+ *
+ * stat_ok indica si los metadatos de la entrada son válidos.
+ *
+ * - stat_ok = 1:
+ *   lstat() ha tenido éxito y st contiene datos válidos.
+ *
+ * - stat_ok = 0:
+ *   Todavía no se ha llamado a lstat() o la llamada ha fallado.
+ *
+ * IMPORTANTE:
+ * Nunca debemos utilizar los campos de entry->st
+ * cuando entry->stat_ok == 0.
+ *
+ * Esto afecta especialmente al cálculo de anchos de -l,
+ * al ordenamiento por fecha (-t) y a la recursividad (-R).
  */
 typedef struct s_directory_entry
 {
 	char		*name;
 	struct stat	st;
-	int			stat_ok;											/* flag 1: st válido; 0: lstat() no llamado o fallido */
+	int			stat_ok;											/* 1: st válido; 0: lstat() no llamado o fallido */
 }	t_directory_entry;
 
 typedef struct s_directory_list
@@ -305,7 +409,7 @@ typedef struct s_directory_list
  * st->st_size → tamaño real del archivo, expresado en bytes para archivos regulares
  * widths.size → número máximo de caracteres necesarios para imprimir ese tamaño dentro del listado
  * st_size = 800	→ 3 caracteres widths.size = 3;
- * st_size = 2500	→ 5 caracteres widths.size = 5;
+ * st_size = 2500	→ 4 caracteres widths.size = 4;
  * Esto permite reservar 'size' posiciones para la columna del tamaño
  * y alinear los números a la derecha
  * 
@@ -322,9 +426,9 @@ typedef struct s_directory_list
 typedef struct s_print_widths
 {
 	size_t	nlink;													/* ancho máximo de st_nlink (número de hard links) */
+	size_t	size;													/* ancho máximo de la columna st_size, en caracteres */
 	size_t	owner;													/* ancho máximo del propietario (st_uid -> getpwuid()) */
 	size_t	group;													/* ancho máximo del grupo (st_gid -> getgrgid()) */
-	size_t	size;													/* ancho máximo de la columna st_size, en caracteres */
 }	t_print_widths;
 
 

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/02 12:35:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/02 16:30:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,14 +54,22 @@ static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 
 /* ----------------------------------------------------------- handle_files ----------------------------------------------------------- */
 
+/*
+ * Solo se consideran los operandos OPS_FILE
+ * OPS_DIRECTORY se procesan por separado
+ * y OPS_ERROR no dispone de metadatos válidos
+ */
 static void	prepare_files_widths(const t_operand_list *operand_list, t_print_widths *widths)
 {
-	(void)operand_list;
-	(void)widths;
+	size_t	i;
 
-	/* prepare_files_widths: debe contar solo OPS_FILE,
-	porque el array también contiene directorios y errores,
-	y estos últimos tienen st inválido */
+	i = 0;
+	while (i < operand_list->count)
+	{
+		if (operand_list->items[i].kind == OPS_FILE)
+			update_print_widths(&operand_list->items[i].st, widths);
+		i++;
+	}
 }
 
 /*
@@ -126,15 +134,19 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list)
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	handle_error(ctx, operand_list);
+
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	init_long_format_time(ctx);												/* inicializa ctx->now (clock_gettime()) solo si está activada la opción -l */
+
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	sort_operands(ctx, operand_list);
+
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	handle_files(ctx, operand_list);
+
 	if (ctx->fatal != FATAL_NONE)
 		return ;
 	handle_directories(ctx, operand_list);
