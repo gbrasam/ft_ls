@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 12:35:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/04 18:25:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,6 +25,7 @@
 #include <pwd.h>													/* getpwuid() información de un usuario por su UID */
 #include <grp.h>													/* getgrgid() información de un grupo por su GID */
 #include <sys/sysmacros.h>											/* major() y minor() */
+#include <inttypes.h>												/* no existe un especificador de printf() específico para blkcnt_t -> '%jd' es una forma portable de imprimir un entero con signo como blkcnt_t, convirtiéndolo a intmax_t */
 
 /**
  * t_argkind representa la clase de argumento de la línea de comandos.
@@ -243,17 +244,21 @@ typedef struct s_operands
  *
  * PRINCIPALES CAMPOS DE struct stat (LINUX)
  *
- * Tipo             Campo       Significado
- * --------------------------------------------------------------
- * mode_t           st_mode     Tipo de archivo y permisos.
- * off_t            st_size     Tamaño lógico en bytes.
- * struct timespec  st_mtim     Fecha y hora de última modificación
- *                             (Linux).
- * uid_t            st_uid      Identificador del propietario.
- * gid_t            st_gid      Identificador del grupo.
- * nlink_t          st_nlink    Número de enlaces duros.
- * blkcnt_t         st_blocks   Bloques de 512 bytes asignados
- *                             (Linux).
+ * Tipo             Campo       Significado                  Formato  Conversión
+ * -----------------------------------------------------------------------------------
+ * mode_t           st_mode     Tipo de archivo y permisos   %jo      (uintmax_t) octal sin signo
+ * off_t            st_size     Tamaño lógico en bytes       %jd      (intmax_t) decimal con signo
+ * struct timespec  st_mtim     Última modificación          N/A      localtime_r()
+ * uid_t            st_uid      ID del propietario           %ju      (uintmax_t) decimal sin signo
+ * gid_t            st_gid      ID del grupo                 %ju      (uintmax_t) decimal sin signo
+ * nlink_t          st_nlink    Número de enlaces duros      %ju      (uintmax_t) decimal sin signo
+ * blkcnt_t         st_blocks   Bloques de 512 B (Linux)     %jd      (intmax_t) decimal con signo
+ * 
+ * %jd  -> Entero decimal con signo (intmax_t).
+ * %ju  -> Entero decimal sin signo (uintmax_t).
+ * %jo  -> Entero octal sin signo (uintmax_t).
+ * 
+ * <inttypes.h> proporciona los tipos intmax_t y uintmax_t, y los formatos correspondientes.
  *
  * TIPOS DE DATOS Y CÁLCULO DE DÍGITOS
  *
@@ -482,6 +487,14 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 void	update_print_widths(const struct stat *st, t_print_widths *widths);
 /* fase 2: impresión del formato largo */
 void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths);
+
+/* long_format_utils.c */
+size_t	count_digits(size_t value);
+void	update_max_width(size_t width, size_t *max_width);
+void	format_file_mode(mode_t mode, char permissions[11]);
+void	print_file_owner(const struct stat *st, size_t width);
+void	print_file_group(const struct stat *st, size_t width);
+void	format_file_time(const struct stat *st,const struct timespec *now, char date[32]);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);

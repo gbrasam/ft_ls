@@ -6,69 +6,11 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/02 16:55:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/04 18:25:38 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
-
-/*
- * Cuenta los dígitos decimales de un entero sin signo.
- *
- * Recibe:
- * - value: número que queremos representar en decimal (size_t)
- *
- * Devuelve:
- * - Número de caracteres necesarios para representar sus dígitos,
- *   sin incluir espacios de alineación
- * 
- * Se inicializa digits a 1, porque incluso 0 ocupa un dígito
- *
- * Ejemplo:
- * value = 125
- * 125 -> 12 -> 1
- * digits = 3
- *
- * Los campos de t_print_widths son size_t porque representan
- * anchos de columnas, es decir, cantidades de caracteres
- *
- * count_digits() permite calcular el ancho de valores numéricos:
- * - st_nlink: número de enlaces duros
- * - st_size: tamaño en bytes, si es no negativo
- * - st_uid: identificador numérico si getpwuid() no encuentra usuario
- * - st_gid: identificador numérico si getgrgid() no encuentra grupo
- *
- * IMPORTANTE:
- * - Los campos originales de struct stat tienen tipos propios
- * - Solo se convierten a size_t cuando la conversión es adecuada
- * - Esta función no contempla números negativos ni su signo '-'
- * - No modifica los metadatos originales: value es una copia
- * - No actualiza t_print_widths; solo devuelve un número
- *
- * Las funciones update_*_width() compararán el resultado
- * con el ancho máximo acumulado y lo actualizarán si es mayor
- */
-static size_t	count_digits(size_t value)
-{
-	size_t	digits;
-
-	digits = 1;
-	while (value >= 10)
-	{
-		value /= 10;
-		digits++;
-	}
-	return (digits);
-}
-
-/*
- * Recibe un ancho ya calculado y actualiza el máximo
- */
-static void	update_max_width(size_t width, size_t *max_width)
-{
-	if (width > *max_width)
-		*max_width = width;
-}
 
 /*
  * Actualiza los anchos máximos de las columnas de longitud variable
@@ -280,8 +222,7 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
 /*
  * Imprime una entrada en el formato largo de ls (-l).
  *
- * Cada entrada ocupa una línea y muestra sus metadatos
- * además del nombre.
+ * Cada entrada ocupa una línea y muestra sus metadatos además del nombre.
  *
  * Ejemplo con LC_ALL=C:
  *   -rw-r--r-- 1 root root 125 Nov  2 17:30 archivo.txt
@@ -314,40 +255,6 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
  * Nombre:
  *   Identifica la entrada que se está mostrando.
  *   Los enlaces simbólicos muestran también su destino.
- *
- * ------------------------------------------------------------
- * PARÁMETROS
- * ------------------------------------------------------------
- *
- * ctx:
- *   Contiene las opciones de ejecución y ctx->now, la hora
- *   obtenida una sola vez para mantener un criterio temporal
- *   uniforme durante todo el listado.
- *
- * name:
- *   Nombre que debe aparecer en el listado.
- *
- * path:
- *   Ruta utilizada para acceder a la entrada.
- *   Puede ser distinta del nombre mostrado.
- *
- *   Es especialmente importante para readlink(), porque
- *   el nombre por sí solo puede no identificar correctamente
- *   un enlace situado dentro de otro directorio.
- *
- * st:
- *   Metadatos válidos obtenidos previamente mediante
- *   stat() o lstat(), según corresponda.
- *
- *   No es necesario repetir esas consultas para imprimir
- *   la información que ya tenemos.
- *
- * widths:
- *   Anchos máximos calculados antes de imprimir el listado.
- *   Permiten alinear las columnas de longitud variable.
- *
- *   Son específicos del conjunto de entradas que se imprime.
- *   Esta función los consulta, pero no los modifica.
  *
  * ------------------------------------------------------------
  * TIPO DE ARCHIVO Y PERMISOS
@@ -390,8 +297,7 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
  * aproximado de seis meses y que no esté más de una hora
  * en el futuro respecto a la hora actual.
  *
- * Las fechas fuera de ese intervalo muestran el año
- * en lugar de la hora.
+ * Las fechas fuera de ese intervalo muestran el año en lugar de la hora.
  *
  * El criterio se evalúa respecto a ctx->now, obtenido
  * una sola vez para evitar diferencias durante el listado.
@@ -499,26 +405,116 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
  * la alineación de las columnas.
  *
  * ------------------------------------------------------------
- * RESPONSABILIDAD
+ * TIPOS DE DATOS DE STRUCT STAT Y FORMATOS DE PRINTF
  * ------------------------------------------------------------
  *
- * Esta función imprime una única entrada.
+ * Tipo             Campo       Significado                  Formato  Conversión
+ * -----------------------------------------------------------------------------------
+ * mode_t           st_mode     Tipo de archivo y permisos   %jo      (uintmax_t)
+ * off_t            st_size     Tamaño lógico en bytes       %jd      (intmax_t)
+ * struct timespec  st_mtim     Última modificación          N/A      localtime_r()
+ * uid_t            st_uid      ID del propietario           %ju      (uintmax_t)
+ * gid_t            st_gid      ID del grupo                 %ju      (uintmax_t)
+ * nlink_t          st_nlink    Número de enlaces duros      %ju      (uintmax_t)
+ * blkcnt_t         st_blocks   Bloques de 512 B (Linux)     %jd      (intmax_t)
  *
- * No recorre directorios, no ordena entradas, no calcula
- * anchos máximos ni obtiene la hora actual.
+ * FORMATOS:
  *
- * La preparación del listado y la impresión son
- * responsabilidades separadas.
+ * %jd  -> Entero decimal con signo (intmax_t).
+ * %ju  -> Entero decimal sin signo (uintmax_t).
+ * %jo  -> Entero octal sin signo (uintmax_t).
  *
- * PENDIENTE:
- *   Implementar la representación de cada campo y verificar
- *   que coincide con los anchos calculados previamente.
+ * NOTAS:
+ *
+ * - <inttypes.h> proporciona los tipos intmax_t y uintmax_t,
+ *   y los formatos correspondientes.
+ *
+ * - st_mode: %jo muestra el valor numérico en octal.
+ *   Para ls -l hay que interpretar sus bits y generar una
+ *   cadena de tipo y permisos (ejemplo: -rw-r--r--).
+ *
+ * - st_mtim: no tiene un formato directo en printf().
+ *   Se utiliza st_mtim.tv_sec para convertir la fecha mediante
+ *   localtime_r() y después formatearla con strftime().
+ *
+ * - st_uid y st_gid: ls -l muestra normalmente nombres obtenidos
+ *   con getpwuid() y getgrgid(), que se imprimen con %s.
+ *   Los formatos %ju sirven para mostrar los ID numéricos.
+ *
+ * - st_blocks: se utiliza para calcular "total N", no se imprime
+ *   como una columna individual del formato largo.
+ *
+ * - Para alinear columnas, printf() permite anchos dinámicos:
+ *     %*ju  -> Número alineado a la derecha.
+ *     %*jd  -> Número alineado a la derecha.
+ *     %-*s  -> Texto alineado a la izquierda.
+ *
+ *   El argumento correspondiente al ancho debe ser de tipo int.
+ * 
+ * ANCHOS DE CAMPO EN PRINTF:
+ *
+ * %5d   -> Ancho fijo de 5 caracteres, alineado a la derecha.
+ *          Ejemplo: printf("%5d", 12);
+ *          Resultado: "   12" (3 espacios + 2 dígitos).
+ *
+ * %*d   -> Ancho dinámico, alineado a la derecha.
+ *          El '*' indica que el ancho se obtiene del siguiente
+ *          argumento de printf(), que debe ser de tipo int.
+ *          Ejemplo: printf("%*d", 5, 12);
+ *          Resultado: "   12".
+ *
+ * %-5d  -> Ancho fijo de 5 caracteres, alineado a la izquierda.
+ *          Ejemplo: printf("%-5d", 12);
+ *          Resultado: "12   ".
+ *
+ * %-*d  -> Ancho dinámico, alineado a la izquierda.
+ *          Ejemplo: printf("%-*d", 5, 12);
+ *          Resultado: "12   ".
+ * 
+ * * ALINEACIÓN DE COLUMNAS EN LS -L:
+ *
+ * Campo             Ejemplo          Alineación
+ * ---------------------------------------------------------------
+ * Tipo y permisos   -rw-rw-r--       Se representan mediante 10 caracteres de longitud fija.
+ *                                    El especificador %jo imprime un número en octal (base 8)
+ * Enlaces duros     1                Alineados a la derecha mediante %*ju
+ * Propietario       gebravo          Alineados a la izquierda mediante %-*s
+ * Grupo             gebravo          Alineados a la izquierda mediante %-*s
+ * Tamaño            1                Alineados a la derecha mediante %*jd
+ * Fecha             Nov  4 14:40     Formato de fecha específico. No utiliza los anchos calculados en t_print_widths
+ * Nombre            archivo1         Sin relleno. Se imprime tal cual, sin ancho ni relleno adicional
+ * 
+ * gebravo@debian-hetzner:~/42_ft_ls$ ls -l t/d
+ * total 12
+ * -rw-rw-r-- 1 gebravo gebravo    1 Nov  4 14:40 archivo1
+ * -rw-rw-r-- 1 gebravo gebravo 5000 Nov  4 14:40 archivo2
  */
 void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths)
 {
-	(void)ctx;
-	(void)name;
+	char	permissions[11];
+	char	date[32];
+
 	(void)path;
-	(void)st;
-	(void)widths;
+	/* tipo y permisos */
+	format_file_mode(st->st_mode, permissions);
+	printf("%s ", permissions);
+
+	/* número de enlaces duros */
+	printf("%*ju ", (int)widths->nlink, (uintmax_t)st->st_nlink);
+
+	/* propietario */
+	print_file_owner(st, widths->owner);
+
+	/* grupo */
+	print_file_group(st, widths->group);
+
+	/* tamaño */
+	printf("%*jd ", (int)widths->size, (intmax_t)st->st_size);
+
+	/* fecha de modificación */
+	format_file_time(st, &ctx->now, date);
+	printf("%s ", date);
+	
+	/* nombre */
+	printf("%s\n", name);
 }
