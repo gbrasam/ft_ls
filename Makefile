@@ -6,7 +6,7 @@
 #    By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/10/02 11:41:25 by gebravo           #+#    #+#              #
-#    Updated: 2026/11/01 12:00:20 by gebravo          ###   ########.fr        #
+#    Updated: 2026/11/04 12:35:00 by gebravo          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -25,8 +25,10 @@ SRCS		= $(SRC_DIR)/main.c \
 			  $(SRC_DIR)/run.c \
 			  $(SRC_DIR)/operands_classify.c \
 			  $(SRC_DIR)/operands_handle.c \
-			  $(SRC_DIR)/directory.c \
 			  $(SRC_DIR)/directory_entries.c \
+			  $(SRC_DIR)/load_directory_entries.c \
+			  $(SRC_DIR)/display_directory_entries.c \
+			  $(SRC_DIR)/directory_entries_utils.c \
 			  $(SRC_DIR)/sort_directory.c \
 			  $(SRC_DIR)/sort_operand.c \
 			  $(SRC_DIR)/long_format.c \

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/02 16:50:08 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/04 12:35:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -451,13 +451,25 @@ void	run_ls(t_ctx *ctx, t_operands *ops);
 void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list);
 
 /* operands_handle.c */
+/* nivel de operandos-recorrer operand_list
+   e identificar los operandos OPS_ERROR, OPS_FILES, OPS_DIRECTORY */
 void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 
-/* directory.c */
-void	list_directory(t_ctx *ctx, const char *path);
-
 /* directory_entries.c */
-int		store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *directory_list);
+/* nivel de directorio individual-ciclo de vida de un directorio concreto */
+void	list_directory(t_ctx *ctx, const char *name);
+
+/* load_directory_entries.c (open, read et store)*/
+int		load_directory_entries(t_ctx *ctx, const char *name, t_directory_list *directory_list);
+
+/* display_directory_entries.c */
+/* ordena y coordina la presentación de las entradas */
+void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_list);
+
+/* directory_entries_utils.c */
+int		calculate_capacity(size_t capacity, size_t *new_capacity);
+int		load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *directory_entry);
+int		ensure_capacity(t_directory_list *directory_list);
 
 /* sort_directory.c */
 void	sort_directory_entries(t_ctx *ctx, t_directory_list *directory_list);

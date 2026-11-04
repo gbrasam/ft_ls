@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/02 16:30:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/04 12:35:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -105,6 +105,12 @@ static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
 
 /* -------------------------------------------------------- handle_directories -------------------------------------------------------- */
 
+/*
+ * handle_directories() — nivel de operandos
+ * Gestiona los directorios que el usuario ha pasado por argumentos
+ * Su responsabilidad es recorrer operand_list, identificar los operandos OPS_DIRECTORY
+ * y solicitar el procesamiento de cada uno.
+ */
 static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 {
 	size_t	i;
@@ -116,8 +122,9 @@ static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 			list_directory(ctx, operand_list->items[i].name);
 		i++;
 	}
-	/* TODO coordinar la recursividad -R */
 }
+
+/* --------------------------------------------------------- handle_operands --------------------------------------------------------- */
 
 /*
  * [GNU ls]	presenta los operandos no directorio antes de listar los directorios,

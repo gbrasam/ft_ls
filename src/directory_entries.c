@@ -5,144 +5,30 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/10/20 13:33:40 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/01 13:10:35 by gebravo          ###   ########.fr       */
+/*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
+/*   Updated: 2026/11/04 12:35:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
 /*
- * calcula la siguiente capacidad y comprueba posibles desbordamientos
- * SIZE_MAX: el mayor número de bytes que puede representar size_t
- * sizeof(t_directory_entry): los bytes que ocupa una entrada
- * SIZE_MAX / sizeof(t_directory_entry): el número máximo de entradas cuyo tamaño total podemos representar sin desbordamiento
- * new_capacity: el número de entradas para las que queremos reservar espacio
+ * list_directory() — nivel de directorio individual
+ * Se ocupa del ciclo de vida de un directorio concreto:
+ * 1. Inicializar su lista de entradas.
+ * 2. Cargar sus entradas (fase 1).
+ * 3. Ordenar, preparar y mostrar el listado (fase 2).
+ * 4. Gestionar posteriormente la recursividad -R.
+ * 5. Liberar la memoria.
  */
-static int calculate_capacity(size_t capacity, size_t *new_capacity)
+void	list_directory(t_ctx *ctx, const char *name)
 {
-	if (capacity == 0)																									/* primera reserva */
-		*new_capacity = 4;
-	else
-	{
-		if (capacity > SIZE_MAX / 2)																					/* evitar desbordamiento al duplicar capacity */
-			return (1);
-		*new_capacity = capacity * 2;
-	}
-	if (*new_capacity > (SIZE_MAX / sizeof(t_directory_entry)))															/* evitar desbordamiento al calcular los bytes para realloc() */
-		return (1);
+	t_directory_list	directory_list;
 
-	return (0);
+	init_directory_list(&directory_list);
+	if (load_directory_entries(ctx, name, &directory_list) == 0)
+		handle_directory_entries(ctx, &directory_list);
+	clean_directory_list(&directory_list);
 }
 
-/*
- * Obtiene mediante lstat() los metadatos de cada entrada descubierta
- * con readdir() dentro de un directorio
- * 
- * Solo se llama cuando alguna opción requiere esos metadatos (-l, -t, -R)
- *
- * Devuelve:
- * 0: operación no fatal (aunque lstat() haya fallado)
- * 1: error fatal por fallo de memoria al construir la ruta
- * 
- * cuando falla lstat(), la función informa del error y actualiza ctx->status,
- * pero no interrumpe el recorrido del directorio
- */
-static int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *directory_entry)
-{
-	char	*path;
-
-	path = build_path(name_directory, directory_entry->name);															/* entry->name contiene "clean.c"; construimos "src/clean.c" */
-	if (!path)
-	{
-		ctx->fatal = FATAL_NOMEM;
-		return (1);
-	}
-	if (lstat(path, &directory_entry->st) == 0)
-		directory_entry->stat_ok = 1;
-	else
-	{
-		fprintf(stderr, "%s: cannot access '%s': %s\n", ctx->prog, path, strerror(errno));
-		if (ctx->status == 0)																							/* solo eleva el estado de 0 a 1, sin reducir un estado 2 anterior */
-			ctx->status = 1;
-	}
-	free(path);
-	return (0);
-}
-
-/*
- * garantizar que hay espacio para guardar una nueva entrada
- * solo se amplia la memoria cuando es necesario, no en todas las llamadas
- * - comprobar si queda espacio
- * - calcular la nueva capacidad
- * - reservar o ampliar memoria con realloc()
- * - actualizar list->items y list->capacity solo cuando realloc() tiene éxito
- *
- * ¡! si realloc() falla, list->items sigue apuntando a la memoria anterior,
- *    porque hemos utilizado el puntero temporal entries
- *    no se pierden las entradas que ya se habían guardado
- */
-static int	ensure_capacity(t_directory_list *directory_list)
-{
-	t_directory_entry	*entries;
-	size_t				new_capacity;
-
-	if (directory_list->count < directory_list->capacity)																/* no es necesario ampliar memoria */
-		return (0);
-
-	if (calculate_capacity(directory_list->capacity, &new_capacity) == 1)												/* desbordamiento */
-		return (1);
-
-	entries = realloc(directory_list->items, sizeof(t_directory_entry) * new_capacity);
-	if (!entries)
-		return (1);
-
-	directory_list->items = entries;
-	directory_list->capacity = new_capacity;
-	return (0);
-}
-
-
-/*
- * almacena una entrada del directorio en el array dinámico
- *
- * - amplía la capacidad cuando el array está lleno
- * - copia el nombre porque readdir() puede reutilizar su memoria
- * - obtiene metadatos solo si alguna opción los necesita (-l, -t y -R)
- *
- * devuelve:
- * 0: entrada almacenada
- * 1: error fatal de memoria
- */
-int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *directory_list) 
-{
-	t_directory_entry	*directory_entry;
-
-	if (ensure_capacity(directory_list) == 1)																			/* reservar o ampliar solo cuando el array esté vacio o lleno */
-	{
-		ctx->fatal = FATAL_NOMEM;
-		return (1);
-	}
-
-	directory_entry = &directory_list->items[directory_list->count];
-
-	directory_entry->name = strdup(name_entry);												/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
-	if (!directory_entry->name)
-	{
-		ctx->fatal = FATAL_NOMEM;
-		return (1);
-	}
-
-	directory_entry->stat_ok = 0;															/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
-	if (ctx->opts.l || ctx->opts.t || ctx->opts.big_r)
-	{
-		if (load_stat(ctx, name_directory, directory_entry) == 1)
-		{
-			free(directory_entry->name);
-			return (1);
-		}
-	}
-
-	directory_list->count++;
-	return (0);
-}
+/* TODO coordinar la recursividad -R */
