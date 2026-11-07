@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 18:30:00 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/07 13:10:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -75,11 +75,16 @@ void	update_max_width(size_t width, size_t *max_width)
  *
  * IDENTIFICACIÓN DEL TIPO DE ARCHIVO (st_mode):
  *
- * Macro             Tipo de archivo                  Carácter ls -l
- * -----------------------------------------------------------------
- * S_ISREG(mode)     Fichero regular                  '-'
- * S_ISDIR(mode)     Directorio                       'd'
- * S_ISLNK(mode)     Enlace simbólico                 'l'
+ * Tipos de archivo (primer carácter de ls -l):
+ *
+ * '-'  Archivo regular           S_ISREG(mode)
+ * 'd'  Directorio                S_ISDIR(mode)
+ * 'l'  Enlace simbólico          S_ISLNK(mode)
+ * 'c'  Dispositivo de caracteres S_ISCHR(mode)
+ * 'b'  Dispositivo de bloques    S_ISBLK(mode)
+ * 'p'  FIFO (tubería con nombre) S_ISFIFO(mode)
+ * 's'  Socket                    S_ISSOCK(mode)
+ * '?'  Tipo desconocido          Valor por defecto
  *
  * El primer carácter de la cadena de permisos indica el tipo
  * de archivo. Los nueve caracteres restantes indican los permisos.
@@ -102,6 +107,291 @@ void	update_max_width(size_t width, size_t *max_width)
  * Lectura (r)            4
  * Escritura (w)          2
  * Ejecución (x)          1
+ * 
+ * 
+ * FORMAT_FILE_MODE: TIPO DE ARCHIVO Y PERMISOS UNIX/LINUX
+ *
+ * Transforma los bits de st_mode en una cadena de 10 caracteres
+ * equivalente a la primera columna de ls -l.
+ *
+ *   permissions[0]     -> Tipo de archivo.
+ *   permissions[1..3]  -> Permisos del propietario (USR).
+ *   permissions[4..6]  -> Permisos del grupo (GRP).
+ *   permissions[7..9]  -> Permisos de otros usuarios (OTH).
+ *   permissions[10]    -> Terminador '\0'.
+ *
+ *
+ * 1. IDENTIFICACION DEL TIPO DE ARCHIVO
+ *
+ * El primer caracter identifica el tipo de archivo:
+ *
+ *   '-'  Archivo regular           S_ISREG(mode)
+ *   'd'  Directorio                S_ISDIR(mode)
+ *   'l'  Enlace simbolico          S_ISLNK(mode)
+ *   'c'  Dispositivo de caracteres S_ISCHR(mode)
+ *   'b'  Dispositivo de bloques    S_ISBLK(mode)
+ *   'p'  FIFO (tuberia con nombre) S_ISFIFO(mode)
+ *   's'  Socket                    S_ISSOCK(mode)
+ *   '?'  Tipo desconocido          Valor por defecto
+ *
+ * Estas macros comprueban el tipo codificado en st_mode.
+ *
+ * Ejemplos:
+ *
+ *   -rw-r--r--  -> Archivo regular.
+ *   drwxr-xr-x  -> Directorio.
+ *   lrwxrwxrwx  -> Enlace simbolico.
+ *
+ *
+ * 2. ESTRUCTURA DE st_mode Y VALORES OCTALES
+ *
+ * st_mode contiene tres clases de informacion:
+ *
+ *   - Tipo de archivo.
+ *   - Bits especiales.
+ *   - Permisos ordinarios (rwx).
+ *
+ * Ejemplo:
+ *
+ *   mode = 0100664 (octal)
+ *
+ *   0100000 -> Tipo: archivo regular.
+ *      000 -> Sin bits especiales.
+ *      664 -> Permisos: rw-rw-r--.
+ *
+ *   Resultado: -rw-rw-r--
+ *
+ * PERMISOS ORDINARIOS
+ *
+ * Cada categoria (USR, GRP, OTH) utiliza estos valores:
+ *
+ *   4 -> Lectura   (r)
+ *   2 -> Escritura (w)
+ *   1 -> Ejecucion (x)
+ *
+ * Los valores se suman:
+ *
+ *   7 = 4 + 2 + 1 -> rwx
+ *   6 = 4 + 2     -> rw-
+ *   5 = 4 + 1     -> r-x
+ *   4 = 4         -> r--
+ *   0             -> ---
+ *
+ * Ejemplo:
+ *
+ *   chmod 755 archivo
+ *
+ *   USR = 7 -> rwx
+ *   GRP = 5 -> r-x
+ *   OTH = 5 -> r-x
+ *
+ *   Resultado: -rwxr-xr-x (archivo regular).
+ *
+ *
+ * 3. PERMISOS ESPECIALES: SETUID, SETGID Y STICKY BIT
+ *
+ * Existen tres bits especiales independientes de los permisos rwx.
+ *
+ * 3.1. S_ISUID (setuid)
+ *
+ * En archivos ejecutables, permite que el programa adopte
+ * el UID efectivo del propietario del archivo.
+ *
+ * Ejemplo:
+ * Si el programa pertenece a Ana, Pedro puede ejecutarlo
+ * con UID efectivo de Ana, siempre que tenga permiso para
+ * ejecutarlo y el sistema aplique setuid.
+ *
+ * Se representa en permissions[3]: 's' o 'S'.
+ *
+ * 3.2. S_ISGID (setgid)
+ *
+ * En archivos ejecutables, permite que el programa adopte
+ * el GID efectivo del grupo propietario del archivo.
+ *
+ * Ejemplo:
+ * Un programa pertenece al grupo "empleados".
+ * Luis, que pertenece al grupo "ventas", puede ejecutarlo
+ * con GID efectivo "empleados" si tiene permiso de ejecucion
+ * y el sistema aplica setgid.
+ *
+ * En directorios, los nuevos archivos y subdirectorios
+ * heredan normalmente el grupo propietario del directorio.
+ *
+ * Se representa en permissions[6]: 's' o 'S'.
+ *
+ * 3.3. S_ISVTX (sticky bit)
+ *
+ * En directorios compartidos, restringe el borrado y
+ * renombrado de entradas a:
+ *
+ *   - El propietario de la entrada.
+ *   - El propietario del directorio.
+ *   - Usuarios con privilegios suficientes.
+ *
+ * Ejemplo habitual: /tmp.
+ *
+ * Se representa en permissions[9]: 't' o 'T'.
+ *
+ *
+ * 4. VALORES OCTALES DE LOS BITS ESPECIALES
+ *
+ * Los bits especiales utilizan tambien los valores 4, 2 y 1,
+ * pero en una posicion octal distinta de los permisos rwx.
+ *
+ *   4 -> setuid      S_ISUID
+ *   2 -> setgid      S_ISGID
+ *   1 -> sticky bit  S_ISVTX
+ *
+ * En las cuatro cifras de permisos, la primera representa
+ * los bits especiales:
+ *
+ *   ESPECIAL | USR | GRP | OTH
+ *      0        7     5     5     -> 0755
+ *      4        7     5     5     -> 4755 (setuid)
+ *      2        7     5     5     -> 2755 (setgid)
+ *      1        7     5     5     -> 1755 (sticky)
+ *
+ * Los bits especiales tambien pueden combinarse:
+ *
+ *   3 = 2 + 1     -> setgid + sticky
+ *   5 = 4 + 1     -> setuid + sticky
+ *   6 = 4 + 2     -> setuid + setgid
+ *   7 = 4 + 2 + 1 -> los tres bits especiales
+ *
+ * Ejemplos:
+ *
+ *   chmod 4755 archivo -> Activa setuid.
+ *   chmod 2755 archivo -> Activa setgid.
+ *   chmod 1755 dir     -> Activa sticky bit.
+ *   chmod 6755 archivo -> Activa setuid y setgid.
+ *   chmod 7755 archivo -> Activa los tres bits.
+ *   chmod 0755 archivo -> Desactiva los tres bits.
+ *
+ * IMPORTANTE:
+ *
+ * En estos ejemplos, chmod establece el conjunto completo
+ * de bits de permiso indicado, no solamente el bit especial.
+ *
+ * Para activar o desactivar un bit sin modificar los demas
+ * permisos, se puede utilizar chmod simbolico:
+ *
+ *   chmod u+s archivo -> Activa setuid.
+ *   chmod u-s archivo -> Desactiva setuid.
+ *
+ *   chmod g+s archivo -> Activa setgid.
+ *   chmod g-s archivo -> Desactiva setgid.
+ *
+ *   chmod +t directorio -> Activa sticky bit.
+ *   chmod -t directorio -> Desactiva sticky bit.
+ *
+ * Tambien pueden combinarse bits mediante operaciones:
+ *
+ *   mode & S_ISUID  -> Comprueba si setuid esta activado.
+ *   mode | S_ISUID  -> Calcula un valor con setuid activado.
+ *   mode & ~S_ISUID -> Calcula un valor con setuid desactivado.
+ *
+ * Estas operaciones sobre la variable mode NO modifican
+ * los permisos reales del archivo.
+ *
+ *
+ * 5. REPRESENTACION DE LOS BITS ESPECIALES EN ls -l
+ *
+ * Los bits especiales y los permisos de ejecucion son
+ * bits independientes dentro de st_mode.
+ *
+ * Sin embargo, ls -l utiliza la misma posicion visual
+ * para representar ambas informaciones.
+ *
+ *   Posicion        Bit especial       Caracteres
+ *
+ *   permissions[3]  S_ISUID (USR)       's' / 'S'
+ *   permissions[6]  S_ISGID (GRP)       's' / 'S'
+ *   permissions[9]  S_ISVTX (OTH)       't' / 'T'
+ *
+ *   's' -> setuid/setgid activo y permiso x presente.
+ *   'S' -> setuid/setgid activo y permiso x ausente.
+ *   't' -> sticky bit activo y permiso x presente.
+ *   'T' -> sticky bit activo y permiso x ausente.
+ *
+ * Las minusculas indican que existe permiso de ejecucion
+ * en esa categoria; las mayusculas indican que no existe.
+ *
+ * Los bits especiales NO conceden por si mismos ejecucion.
+ * Los caracteres especiales sustituyen a 'x' o '-'
+ * sin aumentar la longitud de la cadena de permisos.
+ *
+ * EJEMPLOS:
+ *
+ *   -rwxr-xr-x -> Sin bits especiales.
+ *   -rwsr-xr-x -> Setuid activo, USR tiene x.
+ *   -rwSr-xr-x -> Setuid activo, USR no tiene x.
+ *   -rwxr-sr-x -> Setgid activo, GRP tiene x.
+ *   -rwxr-Sr-x -> Setgid activo, GRP no tiene x.
+ *   drwxrwxrwt -> Sticky activo, OTH tiene x.
+ *   drwxrwxrwT -> Sticky activo, OTH no tiene x.
+ *
+ *
+ * 6. ACLARACIONES IMPORTANTES
+ *
+ * SETUID:
+ *
+ * Que setuid aparezca en USR no significa que solo afecte
+ * al propietario. Otro usuario con permiso de ejecucion
+ * puede iniciar el programa con UID efectivo del propietario.
+ *
+ * SETGID:
+ *
+ * Que setgid aparezca en GRP no significa que solo afecte
+ * a los miembros de ese grupo. Otro usuario con permiso
+ * de ejecucion puede iniciar el programa con GID efectivo
+ * del grupo propietario del archivo.
+ *
+ * STICKY BIT:
+ *
+ * Aunque se representa en OTH, no afecta exclusivamente
+ * a esos usuarios. En directorios, restringe el borrado
+ * y renombrado de entradas segun sus propietarios y
+ * los privilegios del usuario.
+ *
+ * Ademas, en un directorio el permiso x significa
+ * poder atravesarlo o acceder a sus entradas por nombre.
+ *
+ *
+ * 7. IMPLEMENTACION EN format_file_mode()
+ *
+ * Cada posicion especial combina dos comprobaciones:
+ *
+ *   permissions[3] -> S_ISUID + S_IXUSR
+ *   permissions[6] -> S_ISGID + S_IXGRP
+ *   permissions[9] -> S_ISVTX + S_IXOTH
+ *
+ * Se utiliza AND bit a bit (&) para consultar cada mascara:
+ *
+ *   mode & S_IXUSR
+ *   mode & S_ISUID
+ *
+ * Se utiliza AND logico (&&) para exigir dos condiciones:
+ *
+ *   (mode & S_IXUSR) && (mode & S_ISUID)
+ *
+ * Las cuatro combinaciones son:
+ *
+ *   Especial  Ejecucion   Resultado
+ *      0         0          '-'
+ *      0         1          'x'
+ *      1         0          'S' / 'T'
+ *      1         1          's' / 't'
+ *
+ * La funcion solo representa los bits de st_mode.
+ * No comprueba que usuario puede ejecutar realmente
+ * el archivo ni modifica sus permisos.
+ *
+ * La presencia de setuid o setgid tampoco garantiza
+ * que el sistema aplique su efecto durante la ejecucion.
+ * 
+ * mode & S_IXUSR es una operación AND bit a bit
+ * para comprobar si determinados bits están activos
  */
 void	format_file_mode(mode_t mode, char permissions[11])
 {
@@ -112,46 +402,89 @@ void	format_file_mode(mode_t mode, char permissions[11])
 		permissions[0] = 'd';
 	else if (S_ISLNK(mode))
 		permissions[0] = 'l';
+	else if (S_ISCHR(mode))
+		permissions[0] = 'c';
+	else if (S_ISBLK(mode))
+		permissions[0] = 'b';
+	else if (S_ISFIFO(mode))
+		permissions[0] = 'p';
+	else if (S_ISSOCK(mode))
+		permissions[0] = 's';
+	else
+		permissions[0] = '?';
 	
-	/* identificar permisos propietario USR (User) */
+	/* A.- Identificar permisos propietario USR (User) --------------------------- */
+	/* 1.- permiso de lectura */
 	if (mode & S_IRUSR)
 		permissions[1] = 'r';
 	else
 		permissions[1] = '-';
+	/* 2.- permiso de escritura */
 	if (mode & S_IWUSR)
 		permissions[2] = 'w';
 	else
 		permissions[2] = '-';
-	if (mode & S_IXUSR)
+	/* 3.- permiso de ejecución del propietario y bit especial setuid */
+	/* a.- ¿tiene ejecución y setuid activados? */
+	if ((mode & S_IXUSR) && (mode & S_ISUID))
+		permissions[3] = 's';
+	/* b.- ¿tiene setuid activado, pero no ejecución? */
+	else if (mode & S_ISUID)
+		permissions[3] = 'S';
+	/* c.- ¿tiene ejecución, pero no setuid? */
+	else if (mode & S_IXUSR)
 		permissions[3] = 'x';
+	/* d.- no tiene ejecución ni setuid */
 	else
 		permissions[3] = '-';
 
-	/* identificar permisos grupo GRP (Group) */
+	/* B.- Identificar permisos grupo GRP (Group) -------------------------------- */
+	/* 1.- permiso de lectura */
 	if (mode & S_IRGRP)
 		permissions[4] = 'r';
 	else
 		permissions[4] = '-';
+	/* 2.- permiso de escritura */
 	if (mode & S_IWGRP)
 		permissions[5] = 'w';
 	else
 		permissions[5] = '-';
-	if (mode & S_IXGRP)
+	/* 3.- permiso de ejecución del grupo y bit especial setgid */
+	/* a.- ¿tiene ejecución y setgid activados? */
+	if ((mode & S_IXGRP) && (mode & S_ISGID))
+		permissions[6] = 's';
+	/* b.- ¿tiene setgid activado, pero no ejecución? */
+	else if (mode & S_ISGID)
+		permissions[6] = 'S';
+	/* c.- ¿tiene ejecución, pero no setgid? */
+	else if (mode & S_IXGRP)
 		permissions[6] = 'x';
+	/* d.- no tiene ejecución ni setgid */
 	else
 		permissions[6] = '-';
 
-	/* identificar permisos otros OTH (Others)*/
+	/* C.- Identificar permisos otros OTH (Others) -------------------------------- */
+	/* 1.- permiso de lectura */
 	if (mode & S_IROTH)
 		permissions[7] = 'r';
 	else
 		permissions[7] = '-';
+	/* 2.- permiso de escritura */
 	if (mode & S_IWOTH)
 		permissions[8] = 'w';
 	else
 		permissions[8] = '-';
-	if (mode & S_IXOTH)
+	/* 3.- permiso de ejecución para resto usuarios y stick bit */
+	/* a.- ¿tiene ejecución y sticky bit activados? */
+	if ((mode & S_IXOTH) && (mode & S_ISVTX))
+		permissions[9] = 't';
+	/* b.- ¿tiene sticky bit activado, pero no ejecución? */
+	else if (mode & S_ISVTX)
+		permissions[9] = 'T';
+	/* c.- ¿tiene ejecución, pero no sticky bit activado? */
+	else if (mode & S_IXOTH)
 		permissions[9] = 'x';
+	/* d.- no tiene ejecución ni sticky bit activado*/
 	else
 		permissions[9] = '-';
 
