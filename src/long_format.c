@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 15:25:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 18:30:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -192,16 +192,41 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
 	digits = count_digits(st->st_nlink);
 	update_max_width(digits, &widths->nlink);
 
-	/* st->st_size */
-	if (st->st_size < 0)
+
+	/* st_size (tamaño) o major/minor de st_rdev (identificador del dispositivo) */
+	/*
+	 * En Linux, los archivos especiales de dispositivo permiten acceder
+	 * a dispositivos o interfaces del kernel.
+	 * S_ISCHR(): identifica dispositivos de caracteres.
+	 * S_ISBLK(): identifica dispositivos de bloques.
+	 * En ambos casos, ls -l muestra major, minor en lugar de st_size.
+	 */
+	if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode))
 	{
-		digits = count_digits((size_t)(-(st->st_size + 1)) + 1);
-		digits++;
+		/*
+		 * st_rdev contiene el identificador del dispositivo (major y minor).
+		 * major() y minor() extraen sus valores.
+		 * No guardamos los valores, sino el número de dígitos que ocupan.
+		 * widths->major y widths->minor conservan el ancho máximo encontrado
+		 * para alinear correctamente la salida de ls -l.
+		 */
+		digits = count_digits((size_t)major(st->st_rdev));
+		update_max_width(digits, &widths->major);
+		digits = count_digits((size_t)minor(st->st_rdev));
+		update_max_width(digits, &widths->minor);
 	}
 	else
-		digits = count_digits((size_t)st->st_size);
-	update_max_width(digits, &widths->size);
-
+	{
+		if (st->st_size < 0)
+		{
+			digits = count_digits((size_t)(-(st->st_size + 1)) + 1);
+			digits++;
+		}
+		else
+			digits = count_digits((size_t)st->st_size);
+		update_max_width(digits, &widths->size);
+	}
+	
 	/* st->st_uid */
 	user_info = getpwuid(st->st_uid);
 	if (!user_info)
@@ -217,6 +242,95 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
 	else
 		digits = strlen(group_info->gr_name);
 	update_max_width(digits, &widths->group);
+}
+
+/*
+ * Ajusta los anchos definitivos de la columna compartida
+ * por el tamaño de los archivos y los identificadores de dispositivo.
+ *
+ * CONTEXTO:
+ *
+ * En ls -l, los archivos normales muestran st_size.
+ * Los dispositivos de caracteres o bloques muestran major, minor.
+ *
+ * Ambos formatos ocupan la misma columna y deben alinearse.
+ *
+ * VALORES DE ENTRADA:
+ *
+ * update_print_widths() ha calculado previamente:
+ *
+ * - widths->size:  ancho máximo de st_size.
+ * - widths->major: ancho máximo de major.
+ * - widths->minor: ancho máximo de minor.
+ *
+ * CÁLCULO:
+ *
+ * column_width conserva el mayor ancho necesario entre:
+ *
+ * - El tamaño máximo de un archivo.
+ * - La representación completa de "major, minor".
+ *
+ * El valor 2 corresponde a la coma y al espacio (", ").
+ *
+ * Solo se considera major/minor cuando existen dispositivos
+ * en el listado, para evitar añadir dos caracteres innecesarios
+ * cuando ambos anchos son cero.
+ *
+ * AJUSTE DE LOS ANCHOS:
+ *
+ * widths->size pasa a representar el ancho total compartido.
+ *
+ * widths->major pasa a representar el espacio reservado para
+ * imprimir major, incluido el relleno a su izquierda.
+ *
+ * widths->minor conserva su ancho original, permitiendo
+ * mantener la alineación independiente de minor.
+ *
+ * EJEMPLO:
+ *
+ * Anchos iniciales:
+ *   size  = 8
+ *   major = 2
+ *   minor = 3
+ *
+ * Ancho compartido:
+ *   column_width = max(8, 2 + 2 + 3) = 8
+ *
+ * Anchos definitivos:
+ *   size  = 8
+ *   major = 8 - 2 - 3 = 3
+ *   minor = 3
+ *
+ * Representación:
+ *   Tamaño:      "12345678"
+ *   Dispositivo: " 11, 235"
+ *
+ * IMPORTANTE:
+ *
+ * Esta función modifica widths y debe ejecutarse una sola vez,
+ * después de calcular todos los anchos individuales y antes
+ * de comenzar la impresión.
+ *
+ * No debe volver a llamarse update_print_widths() sobre
+ * estos anchos ya ajustados.
+ *
+ * RESPONSABILIDAD:
+ *
+ * Prepara los anchos definitivos de size y major/minor.
+ * No recorre archivos, no consulta metadatos y no imprime.
+ */
+void	prepare_size_widths(t_print_widths *widths)
+{
+	size_t	column_width;
+
+	column_width = widths->size;
+	if (widths->major > 0 || widths->minor > 0)													/* solo incluir (major, minor) si existen dispositivos en el listado */
+	{
+		if (widths->major + 2 + widths->minor > column_width)									/* ancho total de la columna compartida por st_size y major, minor; el 2 corresponde a ", " */
+			column_width = widths->major + 2 + widths->minor;
+		widths->major = column_width - 2 - widths->minor;
+	}
+	widths->size = column_width;
 }
 
 /*
@@ -526,6 +640,7 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 	char	permissions[11];
 	char	date[32];
 	char	*target;
+	
 
 	/* leer el destino antes de imprimir para evitar líneas incompletas */
 	target = NULL;
@@ -536,30 +651,35 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 			return ;
 	}
 	
-	/* tipo y permisos */
+	/* 0.- print tipo y permisos */
 	format_file_mode(st->st_mode, permissions);
 	printf("%s ", permissions);
 
-	/* número de enlaces duros */
+	/* 1.- print número de enlaces duros */
 	printf("%*ju ", (int)widths->nlink, (uintmax_t)st->st_nlink);
 
-	/* propietario */
+	/* 2.- print propietario */
 	print_file_owner(st, widths->owner);
 
-	/* grupo */
+	/* 3.- print grupo */
 	print_file_group(st, widths->group);
 
-	/* tamaño */
-	printf("%*jd ", (int)widths->size, (intmax_t)st->st_size);
+	/* 4.- print tamaño del archivo o identificador del dispositivo */
+	if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode))
+		printf("%*ju, %*ju ",
+			(int)widths->major, (uintmax_t)major(st->st_rdev),
+			(int)widths->minor, (uintmax_t)minor(st->st_rdev));
+	else
+		printf("%*jd ", (int)widths->size, (intmax_t)st->st_size);
 
-	/* fecha de modificación */
+	/* 5.- print fecha de modificación */
 	format_file_time(st, &ctx->now, date);
 	printf("%s ", date);
 	
-	/* nombre */
+	/* 6.- print nombre */
 	printf("%s", name);
 
-	/* impresión del destino del enlace simbólico */
+	/* 7.- print impresión del destino del enlace simbólico */
 	if (target)
 	{
 		printf(" -> %s", target);

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 15:25:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 18:38:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -236,6 +236,7 @@ typedef struct s_operands
 	size_t	count;
 }	t_operands;
 
+
 /*
  * METADATOS DE UNA ENTRADA DE DIRECTORIO: struct stat
  *
@@ -249,17 +250,19 @@ typedef struct s_operands
  * -----------------------------------------------------------------------------------
  * mode_t           st_mode     Tipo de archivo y permisos   %jo      (uintmax_t) octal sin signo
  * off_t            st_size     Tamaño lógico en bytes       %jd      (intmax_t) decimal con signo
+ * dev_t            st_rdev     Identificador de dispositivo %ju      major() / minor()
  * struct timespec  st_mtim     Última modificación          N/A      localtime_r()
  * uid_t            st_uid      ID del propietario           %ju      (uintmax_t) decimal sin signo
  * gid_t            st_gid      ID del grupo                 %ju      (uintmax_t) decimal sin signo
  * nlink_t          st_nlink    Número de enlaces duros      %ju      (uintmax_t) decimal sin signo
  * blkcnt_t         st_blocks   Bloques de 512 B (Linux)     %jd      (intmax_t) decimal con signo
- * 
+ *
  * %jd  -> Entero decimal con signo (intmax_t).
  * %ju  -> Entero decimal sin signo (uintmax_t).
  * %jo  -> Entero octal sin signo (uintmax_t).
- * 
- * <inttypes.h> proporciona los tipos intmax_t y uintmax_t, y los formatos correspondientes.
+ *
+ * <inttypes.h> proporciona los tipos intmax_t y uintmax_t,
+ * y los formatos correspondientes.
  *
  * TIPOS DE DATOS Y CÁLCULO DE DÍGITOS
  *
@@ -275,29 +278,97 @@ typedef struct s_operands
  * st_mtim es una estructura timespec, no un número entero.
  * Su tratamiento es diferente al de los campos numéricos.
  *
+ * st_rdev es de tipo dev_t y representa un identificador
+ * de dispositivo, no un tamaño en bytes.
+ *
  * DIFERENCIA ENTRE st_size Y st_blocks
  *
  * st_size:
  * - Representa el tamaño lógico del archivo en bytes.
  * - Se utiliza para calcular el ancho de la columna de tamaño
  *   cuando se imprime el formato largo (-l).
+ * - En archivos de dispositivo, ls -l muestra major, minor
+ *   en lugar de st_size.
  *
  * st_blocks:
  * - Representa el espacio asignado en unidades de 512 bytes
  *   en Linux.
- * - Se utilizará posteriormente para calcular el total
- *   que aparece al listar directorios con -l.
+ * - Se utiliza para calcular el total que aparece al listar
+ *   directorios con -l.
  *
  * Ejemplo:
  * Un archivo puede tener:
  * - st_size = 1000 bytes.
  * - st_blocks = 8 bloques de 512 bytes = 4096 bytes asignados.
  *
+ * DISPOSITIVOS ESPECIALES: st_rdev, major() y minor()
+ *
+ * En Linux, algunos archivos representan dispositivos.
+ * Su tipo se identifica mediante st_mode:
+ *
+ * - S_ISCHR(st_mode): dispositivo de caracteres (c).
+ * - S_ISBLK(st_mode): dispositivo de bloques (b).
+ *
+ * Para estos archivos, ls -l no muestra st_size.
+ * En su lugar, muestra dos números: major, minor.
+ *
+ * st_rdev:
+ * - Es un campo de struct stat, de tipo dev_t.
+ * - Contiene el identificador del dispositivo representado.
+ * - No debe confundirse con st_dev, que identifica el
+ *   dispositivo donde reside el propio archivo.
+ *
+ * major() y minor():
+ * - No son campos de struct stat.
+ * - Son macros que extraen los componentes de st_rdev en Linux.
+ * - major(): identifica el controlador o grupo de dispositivos.
+ * - minor(): identifica el dispositivo dentro de ese grupo.
+ *
+ * En Linux se declaran mediante:
+ *
+ * #include <sys/sysmacros.h>
+ *
+ * Ejemplo:
+ *
+ * ls -l /dev/null
+ * crw-rw-rw- 1 root root 1, 3 Oct  8 13:53 /dev/null
+ *
+ * - c: dispositivo de caracteres.
+ * - 1: major.
+ * - 3: minor.
+ *
+ * En C:
+ *
+ * major(st->st_rdev)
+ * minor(st->st_rdev)
+ *
+ * Para imprimir sus valores decimales podemos convertirlos
+ * a uintmax_t y utilizar el formato %ju.
+ *
+ * IMPORTANTE PARA ft_ls:
+ *
+ * - Archivos normales: imprimir st_size.
+ * - Directorios: imprimir st_size.
+ * - Enlaces simbólicos: imprimir st_size del propio enlace.
+ * - Dispositivos de caracteres: imprimir major, minor.
+ * - Dispositivos de bloques: imprimir major, minor.
+ *
+ * La preparación de los anchos de -l debe contemplar:
+ *
+ * - El ancho máximo de los tamaños (st_size).
+ * - El ancho máximo de major.
+ * - El ancho máximo de minor.
+ * - El ancho total necesario para representar major, minor.
+ *
+ * La columna compartida por tamaños e identificadores
+ * debe tener espacio suficiente para ambos formatos.
+ *
  * UTILIZACIÓN DE LOS METADATOS EN ft_ls
  *
  * -l: utiliza el tipo de archivo, permisos, número de enlaces,
- *     propietario, grupo, tamaño y fecha de modificación
- *     para imprimir el formato largo.
+ *     propietario, grupo, tamaño o identificador de dispositivo
+ *     (major, minor) y fecha de modificación para imprimir
+ *     el formato largo.
  *
  * -t: utiliza st_mtim para ordenar los archivos según
  *     su fecha y hora de última modificación.
@@ -433,9 +504,11 @@ typedef struct s_directory_list
 typedef struct s_print_widths
 {
 	size_t	nlink;																	/* ancho máximo de st_nlink (número de hard links) */
-	size_t	size;																	/* ancho máximo de la columna st_size, en caracteres */
+	size_t	size;																	/* ancho máximo de st_size, en caracteres */
 	size_t	owner;																	/* ancho máximo del propietario (st_uid -> getpwuid()) */
 	size_t	group;																	/* ancho máximo del grupo (st_gid -> getgrgid()) */
+	size_t	major;																	/* ancho máximo del número major (inicialmente sus dígitos máximos; después incluye el relleno izquierdo para alinearlo con st_size) - identifica el controlador o tipo de dispositivo gestionado por el kernel */
+	size_t	minor;																	/* ancho máximo del número minor - identifica el dispositivo concreto o la unidad dentro de los gestionados por ese controlador */
 }	t_print_widths;
 
 
@@ -487,6 +560,7 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 /* long_format.c */
 /* fase 1: preparación del listado */
 void	update_print_widths(const struct stat *st, t_print_widths *widths);
+void	prepare_size_widths(t_print_widths *widths);
 /* fase 2: impresión del formato largo */
 void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths);
 

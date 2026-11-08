@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 13:10:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 18:35:55 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,7 +101,10 @@ static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
 
 	init_print_widths(&widths);
 	if (ctx->opts.l)
+	{
 		prepare_files_widths(operand_list, &widths);
+		prepare_size_widths(&widths);
+	}
 	print_files(ctx, operand_list, &widths);
 }
 

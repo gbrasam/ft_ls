@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 15:25:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 18:30:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,12 +38,25 @@
  *
  * CÁLCULO DE ANCHOS:
  *
- * update_print_widths() calcula el espacio necesario para
- * representar el número de enlaces, el propietario, el grupo
- * y el tamaño, conservando el máximo de cada columna.
+ * update_print_widths() calcula los anchos máximos de:
+ *
+ * - Número de enlaces duros (nlink).
+ * - Nombre del propietario o UID (owner).
+ * - Nombre del grupo o GID (group).
+ * - Tamaño lógico del archivo (size).
+ * - Identificadores de dispositivo (major y minor).
+ *
+ * Para dispositivos de caracteres o bloques se calculan
+ * los anchos de major y minor en lugar del tamaño habitual.
+ *
+ * En esta fase se conservan los máximos individuales.
  *
  * Los anchos representan caracteres de la salida impresa,
  * no el tamaño de los datos en memoria.
+ *
+ * La alineación definitiva de la columna compartida por
+ * size y major/minor se realiza posteriormente mediante
+ * prepare_size_widths(), una vez terminado el recorrido.
  *
  * CÁLCULO DEL TOTAL:
  *
@@ -87,10 +100,10 @@
  *
  * RESPONSABILIDAD:
  *
- * Prepara la información necesaria para alinear las columnas
- * y mostrar el total de bloques.
+ * Calcula los anchos individuales y acumula los bloques.
  *
- * No imprime entradas, no convierte las unidades del total,
+ * No realiza el ajuste definitivo de size/major/minor,
+ * no imprime entradas, no convierte las unidades del total,
  * no aplica filtros de visibilidad ni ordena el listado.
  */
 static void	prepare_entries_info(const t_directory_list *directory_list, t_print_widths *widths, blkcnt_t *total_blocks)
@@ -173,7 +186,7 @@ static void	print_directory_entries(t_ctx *ctx, const t_directory_list *director
  * las entradas válidas del directorio, no individualmente por archivo.
  *
  * La función únicamente convierte y devuelve el valor.
- * La impresión de "total N" corresponde a handle_directory_entries()
+ * La impresión de "total N" corresponde a display_directory_entries()
  * y solo se realiza cuando está activada la opción -l.
  *
  * Nota: GNU ls permite configurar las unidades mediante variables
@@ -207,12 +220,18 @@ static blkcnt_t	convert_to_kib_blocks(blkcnt_t total_blocks)
  * 1. Inicializa los anchos mediante init_print_widths()
  *    y el acumulador total a cero.
  *
- * 2. prepare_entries_info() calcula los anchos máximos
- *    y acumula st_blocks de las entradas con stat_ok == 1.
+ * 2. prepare_entries_info() recorre las entradas válidas,
+ *    calcula los anchos máximos individuales y acumula
+ *    los valores de st_blocks.
  *
- * 3. Convierte el total a bloques de 1 KiB y lo imprime.
+ * 3. prepare_size_widths() ajusta los anchos definitivos
+ *    de la columna compartida por size y major/minor.
  *
- * 4. print_directory_entries() imprime el formato largo.
+ * 4. Convierte el total acumulado a bloques de 1 KiB
+ *    mediante convert_to_kib_blocks() y lo imprime.
+ *
+ * 5. print_directory_entries() imprime las entradas
+ *    utilizando los anchos definitivos.
  *
  * SIN LA OPCIÓN -l:
  *
@@ -227,7 +246,7 @@ static blkcnt_t	convert_to_kib_blocks(blkcnt_t total_blocks)
  *
  * TOTAL DE BLOQUES:
  *
- * total es de tipo blkcnt_t, igual que st_blocks.
+ * total_blocks es de tipo blkcnt_t, igual que st_blocks.
  * Representa el espacio de almacenamiento asignado,
  * no el tamaño lógico del archivo (st_size).
  *
@@ -236,8 +255,8 @@ static blkcnt_t	convert_to_kib_blocks(blkcnt_t total_blocks)
  *
  * RESPONSABILIDAD:
  *
- * Prepara los datos necesarios para la impresión
- * y muestra las entradas en el orden recibido.
+ * Coordina la preparación de anchos, el cálculo del total
+ * y la impresión de las entradas.
  *
  * No abre directorios, no obtiene metadatos adicionales,
  * no ordena ni libera directory_list.
@@ -252,6 +271,7 @@ static void	display_directory_entries(t_ctx *ctx, t_directory_list *directory_li
 	if (ctx->opts.l)
 	{
 		prepare_entries_info(directory_list, &widths, &total_blocks);
+		prepare_size_widths(&widths);
 		printf("total %jd\n", (intmax_t)convert_to_kib_blocks(total_blocks));
 	}
 	print_directory_entries(ctx, directory_list, &widths);
@@ -262,5 +282,3 @@ void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_list)
 	sort_directory_entries(ctx, directory_list);
 	display_directory_entries(ctx, directory_list);
 }
-
-/*pendiente construir la ruta completa para readlink().*/

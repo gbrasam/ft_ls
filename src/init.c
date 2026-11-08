@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:43:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 15:25:08 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 18:25:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -114,4 +114,6 @@ void	init_print_widths(t_print_widths *print_widths)
 	print_widths->owner = 0;
 	print_widths->group = 0;
 	print_widths->size = 0;
+	print_widths->major = 0;
+	print_widths->minor = 0;
 }
