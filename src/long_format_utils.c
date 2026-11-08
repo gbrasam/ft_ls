@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/07 13:10:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 12:27:22 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -634,17 +634,92 @@ void	format_file_time(const struct stat *st, const struct timespec *now, char da
 
 	if (!localtime_r(&st->st_mtim.tv_sec, &tm_info))
 	{
-		date[0] = '\0';									/* provisional cadena vacia */
+		date[0] = '\0';																			/* provisional cadena vacia */
         return ;
 	}
 	if (is_recent_file_time(&st->st_mtim, now))
-		format = "%b %e %H:%M";							/* reciente: mostrar hora */
+		format = "%b %e %H:%M";																	/* reciente: mostrar hora */
 	else
-		format = "%b %e  %Y";							/* antigua o futura: mostrar año */
+		format = "%b %e  %Y";																	/* antigua o futura: mostrar año */
 	
 	if (!strftime(date, 32, format , &tm_info))
 	{
-		date[0] = '\0';									/* provisional cadena vacia */
+		date[0] = '\0';																			/* provisional cadena vacia */
 		return ;
 	}
+}
+
+char	*read_link_target(t_ctx *ctx, const char *path, const struct stat *st)
+{
+	ssize_t	n;																					/* numero de bytes copiados en el buffer (target) */
+	size_t	size;
+	char	*target;
+	char	*tmp;
+
+	/*
+	* 'st_size' indica normalmente la longitud en bytes del destino almacenado
+	* En un enlace simbólico, sin embargo no es una garantia absoluta
+	* Usamos 128 bytes como alternativa de inicialización si 'st->st_size' <= 0
+	* ¡! (cast) 'st->st_size' es de tipo 'off_t', normalmente un entero con signo
+	* mientras que 'size_t' es un entero sin signo
+	*/
+	if (st->st_size > 0)
+		size = (size_t)st->st_size;
+	else
+		size = 128;
+	if (size == SIZE_MAX)																		/* comprobar no haya desbordamiento de (size + 1) en el malloc */
+	{
+		ctx->fatal = FATAL_NOMEM;
+		return (NULL);
+	}
+	target = malloc(sizeof(char) * (size + 1));													/* '+1' readlink() NO añade el terminador '\0' en el buffer (target) */											
+	if (!target)
+	{
+		ctx->fatal = FATAL_NOMEM;
+		return (NULL);
+	}
+	n = readlink(path, target, size);															/* readlink() lee la ruta del destino almacenada en ese enlace */
+	if (n == -1)
+	{
+		fprintf(stderr, "%s: cannot read symbolic link '%s': %s\n",
+			ctx->prog, path, strerror(errno));													/* error lectura */
+		if (ctx->status == 0)
+			ctx->status = 1;
+		free(target);
+		return (NULL);
+	}
+	/*
+	 * Si readlink() llena el buffer, el destino puede estar
+	 * truncado. Duplicamos la capacidad y repetimos la lectura.
+	 */
+	while ((size_t)n == size)																	/* 'n' son los bytes que ha copiado readlink() en el buffer (target) y 'size' es la capacidad disponible para guardar el destino. Si ambos son iguales no sabemos si el destino cabe justo o si se ha truncado, por eso ampliamos */
+	{
+		if (size > (SIZE_MAX - 1) / 2)
+		{
+			free(target);
+			ctx->fatal = FATAL_NOMEM;
+			return (NULL);
+		}
+		size *= 2;																				/* duplicar -> estrategia habitual de crecimiento dinámico, porque reduce el número de ampliaciones */
+		tmp = realloc(target, size + 1);														/* usamos un puntero temporal (tmp) porque, si realloc() falla, el bloque original (target) sigue reservado y debemos liberarlo */
+		if (!tmp)
+		{
+			free(target);
+			ctx->fatal = FATAL_NOMEM;
+			return (NULL);
+		}
+		target = tmp;																			/* copia de la dirección de memoria almacenada en tmp, no el contenido del bloque de memoria - target y tmp apuntan al mismo bloque de memoria - por tanto, bastará con liberar target */
+		n = readlink(path, target, size);
+		if (n == -1)
+		{
+			fprintf(stderr, "%s: cannot read symbolic link '%s': %s\n",
+				ctx->prog, path, strerror(errno));												/* error lectura */
+			if (ctx->status == 0)
+				ctx->status = 1;
+			free(target);
+			return (NULL);
+		}
+	}
+	target[n] = '\0';																			/* readlink() NO añade el terminador '\0' en el buffer (target) */
+	return (target);
 }

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 18:25:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 12:01:19 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #define FT_LS_H
 
 #include <stdio.h>
+#include <unistd.h>																	/* readlink() */
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -22,10 +23,10 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/types.h>
-#include <pwd.h>													/* getpwuid() información de un usuario por su UID */
-#include <grp.h>													/* getgrgid() información de un grupo por su GID */
-#include <sys/sysmacros.h>											/* major() y minor() */
-#include <inttypes.h>												/* no existe un especificador de printf() específico para blkcnt_t -> '%jd' es una forma portable de imprimir un entero con signo como blkcnt_t, convirtiéndolo a intmax_t */
+#include <pwd.h>																	/* getpwuid() información de un usuario por su UID */
+#include <grp.h>																	/* getgrgid() información de un grupo por su GID */
+#include <sys/sysmacros.h>															/* major() y minor() */
+#include <inttypes.h>																/* no existe un especificador de printf() específico para blkcnt_t -> '%jd' es una forma portable de imprimir un entero con signo como blkcnt_t, convirtiéndolo a intmax_t */
 
 /**
  * t_argkind representa la clase de argumento de la línea de comandos.
@@ -124,7 +125,7 @@ typedef enum e_fatal
 typedef struct s_opts
 {
 	int	l;
-	int	big_r;														/* -R */
+	int	big_r;																		/* -R */
 	int	a;
 	int	r;
 	int	t;
@@ -194,7 +195,7 @@ typedef struct s_ctx
 	int				printed;
 	int				headers;
 	t_fatal			fatal;
-	int				error_errno;									/* errno asociado al error fatal de la ejecución */
+	int				error_errno;													/* errno asociado al error fatal de la ejecución */
 	struct timespec	now;
 
 }	t_ctx;
@@ -203,9 +204,9 @@ typedef struct s_operand_info
 {
 	const char		*name;
 	t_operand_kind	kind;
-	int				err;											/* errno asociado al error de este operando */
+	int				err;															/* errno asociado al error de este operando */
 	struct stat		st;
-	int				stat_ok;										/* 1: st válido; 0: lstat() no llamado o fallido */
+	int				stat_ok;														/* 1: st válido; 0: lstat() no llamado o fallido */
 }	t_operand_info;
 
 typedef struct s_operand_list
@@ -367,14 +368,14 @@ typedef struct s_directory_entry
 {
 	char		*name;
 	struct stat	st;
-	int			stat_ok;											/* 1: st válido; 0: lstat() no llamado o fallido */
+	int			stat_ok;															/* 1: st válido; 0: lstat() no llamado o fallido */
 }	t_directory_entry;
 
 typedef struct s_directory_list
 {
 	t_directory_entry	*items;
-	size_t				count;      								/* entradas almacenadas */
-	size_t				capacity;   								/* espacio reservado, en número de entradas */
+	size_t				count;      												/* entradas almacenadas */
+	size_t				capacity;   												/* espacio reservado, en número de entradas */
 }	t_directory_list;
 
 /*
@@ -430,10 +431,10 @@ typedef struct s_directory_list
  */
 typedef struct s_print_widths
 {
-	size_t	nlink;													/* ancho máximo de st_nlink (número de hard links) */
-	size_t	size;													/* ancho máximo de la columna st_size, en caracteres */
-	size_t	owner;													/* ancho máximo del propietario (st_uid -> getpwuid()) */
-	size_t	group;													/* ancho máximo del grupo (st_gid -> getgrgid()) */
+	size_t	nlink;																	/* ancho máximo de st_nlink (número de hard links) */
+	size_t	size;																	/* ancho máximo de la columna st_size, en caracteres */
+	size_t	owner;																	/* ancho máximo del propietario (st_uid -> getpwuid()) */
+	size_t	group;																	/* ancho máximo del grupo (st_gid -> getgrgid()) */
 }	t_print_widths;
 
 
@@ -495,6 +496,7 @@ void	format_file_mode(mode_t mode, char permissions[11]);
 void	print_file_owner(const struct stat *st, size_t width);
 void	print_file_group(const struct stat *st, size_t width);
 void	format_file_time(const struct stat *st,const struct timespec *now, char date[32]);
+char	*read_link_target(t_ctx *ctx, const char *path, const struct stat *st);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);

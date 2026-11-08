@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 17:30:58 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 13:10:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -118,6 +118,8 @@ static void	print_directory_entries(t_ctx *ctx, const t_directory_list *director
 	i = 0;
 	while (i < directory_list->count)
 	{
+		if (ctx->fatal != FATAL_NONE)
+			return ;
 		if (ctx->opts.l)
 		{
 			/*

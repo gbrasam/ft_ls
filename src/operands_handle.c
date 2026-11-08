@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 12:35:08 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 13:10:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -82,6 +82,8 @@ static void	print_files(t_ctx *ctx, const t_operand_list *operand_list, const t_
 	i = 0;
 	while (i < operand_list->count)
 	{
+		if (ctx->fatal != FATAL_NONE)
+			return ;
 		if (operand_list->items[i].kind == OPS_FILE)
 		{
 			if (ctx->opts.l)
@@ -116,8 +118,10 @@ static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 	size_t	i;
 
 	i = 0;
-	while (i < operand_list->count && ctx->fatal == FATAL_NONE)
+	while (i < operand_list->count)
 	{
+		if (ctx->fatal != FATAL_NONE)
+			return ;
 		if (operand_list->items[i].kind == OPS_DIRECTORY)
 			list_directory(ctx, operand_list->items[i].name);
 		i++;

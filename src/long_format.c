@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 18:25:38 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 13:10:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -305,17 +305,18 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
  * Los nombres de los meses dependen del locale.
  * En nuestras pruebas utilizamos LC_ALL=C.
  *
- * ------------------------------------------------------------
- * ENLACES SIMBÓLICOS
+ * * ------------------------------------------------------------
+ * ENLACES SIMBOLICOS: readlink()
  * ------------------------------------------------------------
  *
- * Un enlace simbólico almacena una ruta hacia otro archivo
- * o directorio. No es un enlace físico (hard link).
+ * Un enlace simbolico almacena una ruta hacia otro archivo
+ * o directorio. Es diferente de un enlace fisico (hard link).
  *
- * En formato largo se muestra:
+ * En ls -l se muestra:
  *   enlace -> destino
  *
- * readlink() permite obtener el destino del enlace.
+ * readlink() lee la ruta almacenada en el enlace simbolico
+ * sin seguirlo y sin necesitar que exista su destino.
  *
  * Firma:
  *   ssize_t readlink(const char *path, char *buf, size_t bufsiz);
@@ -323,27 +324,58 @@ void	update_print_widths(const struct stat *st, t_print_widths *widths)
  * Cabecera:
  *   <unistd.h>
  *
- * Parámetros:
- *   path   Ruta del enlace simbólico.
- *   buf    Buffer donde se escribe el destino.
- *   bufsiz Capacidad del buffer en bytes.
+ * Parametros:
+ *   path   -> Ruta del enlace simbolico que queremos consultar.
+ *   buf    -> Buffer donde se copia el destino.
+ *   bufsiz -> Numero maximo de bytes que pueden copiarse.
  *
- * Valor de retorno:
- *   Número de bytes escritos en el buffer.
- *   -1 si se produce un error.
+ * VALOR DE RETORNO:
+ *
+ *   n >= 0 -> Exito. Numero de bytes copiados en el buffer.
+ *   n == -1 -> Error. errno indica la causa.
+ *
+ * POSIBLES ERRORES:
+ *
+ *   ENOENT -> El enlace ha desaparecido o falta algun
+ *             componente de la ruta.
+ *
+ *   EACCES -> No tenemos permiso para atravesar algun
+ *             directorio de la ruta.
+ *
+ *   EINVAL -> La ruta no corresponde a un enlace simbolico.
+ *
+ * Aunque lstat() haya identificado previamente un enlace,
+ * readlink() puede fallar si el sistema de archivos cambia
+ * entre ambas llamadas.
  *
  * IMPORTANTE:
+ *
  *   readlink() NO añade el terminador '\0'.
  *
  *   Para utilizar el resultado como cadena C debemos
- *   reservar espacio para el terminador y añadirlo
- *   nosotros después de una lectura correcta.
+ *   reservar un byte adicional y añadirlo nosotros
+ *   despues de una lectura correcta:
  *
- *   Si el buffer es demasiado pequeño, el destino puede
- *   quedar truncado. Hay que comprobar su capacidad.
+ *      buffer[n] = '\0';
  *
- *   El destino devuelto es el texto almacenado en el enlace;
- *   no tiene por qué ser una ruta absoluta ni existir.
+ * IMPORTANTE: TRUNCAMIENTO
+ *
+ *   Si el buffer es demasiado pequeño, readlink() copia
+ *   solamente los bytes que caben, sin devolver un error.
+ *
+ *   Si n == bufsiz, el destino puede estar truncado.
+ *   Debemos ampliar el buffer y repetir la lectura.
+ *
+ *   Si n < bufsiz, el destino cabe completo.
+ *
+ * OTRAS CONSIDERACIONES:
+ *
+ *   - Un enlace roto no provoca por si mismo un error.
+ *   - El destino puede ser una ruta relativa o absoluta.
+ *   - readlink() devuelve el texto almacenado en el enlace,
+ *     no la ruta canonica del archivo de destino.
+ *   - Si readlink() devuelve -1, no debemos utilizar
+ *     el contenido del buffer como un destino valido.
  *
  * ------------------------------------------------------------
  * DISPOSITIVOS ESPECIALES
@@ -493,8 +525,8 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 {
 	char	permissions[11];
 	char	date[32];
+	char	*target;
 
-	(void)path;
 	/* tipo y permisos */
 	format_file_mode(st->st_mode, permissions);
 	printf("%s ", permissions);
@@ -517,4 +549,23 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 	
 	/* nombre */
 	printf("%s\n", name);
+
+	/* si enlace dinámico, imprimir " -> destino" (target) */
+	if (S_ISLNK(st->st_mode))
+	{
+		target = read_link_target(ctx, path, st);
+		if (!target)
+		{
+			if (ctx->fatal != FATAL_NONE)
+			{
+				/* Interrumpir el procesamiento */
+			}
+			else
+			{
+				/* Error no fatal: continuar con otras entradas */
+			}
+		}
+		printf("->%s\n", target);
+		free(target);
+	}
 }

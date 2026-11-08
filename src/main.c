@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:21:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/14 16:50:55 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 13:10:10 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,8 @@ int	main(int argc, char **argv)
 	init_ctx(&ctx, argv[0]);
 	if (parse_args(argc, argv, &ctx, &ops) == 0)
 		run_ls(&ctx, &ops);
-	report_fatal(&ctx);
+	if (ctx.fatal != FATAL_NONE)
+		report_fatal(&ctx);
 	clean_all(&ctx, &ops);
 	return (ctx.status);
 }
