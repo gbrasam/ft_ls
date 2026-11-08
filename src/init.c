@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:43:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/02 12:35:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 15:25:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -100,8 +100,9 @@ void	init_long_format_time(t_ctx *ctx)
 	}
 }
 
-void	init_directory_list(t_directory_list *directory_list)
+void	init_directory_list(const char *directory_name, t_directory_list *directory_list)
 {
+	directory_list->directory_name = directory_name;
 	directory_list->items = NULL;
 	directory_list->count = 0;
 	directory_list->capacity = 0;

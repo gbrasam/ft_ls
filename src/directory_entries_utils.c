@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 13:33:40 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 12:35:28 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 15:25:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,11 +48,11 @@ int calculate_capacity(size_t capacity, size_t *new_capacity)
  * cuando falla lstat(), la función informa del error y actualiza ctx->status,
  * pero no interrumpe el recorrido del directorio
  */
-int	load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *directory_entry)
+int	load_stat(t_ctx *ctx, const char *directory_name, t_directory_entry *directory_entry)
 {
 	char	*path;
 
-	path = build_path(name_directory, directory_entry->name);															/* entry->name contiene "clean.c"; construimos "src/clean.c" */
+	path = build_path(directory_name, directory_entry->name);															/* entry->name contiene "clean.c"; construimos "src/clean.c" */
 	if (!path)
 	{
 		ctx->fatal = FATAL_NOMEM;

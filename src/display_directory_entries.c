@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 13:10:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 15:25:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -113,6 +113,7 @@ static void	prepare_entries_info(const t_directory_list *directory_list, t_print
 
 static void	print_directory_entries(t_ctx *ctx, const t_directory_list *directory_list, const t_print_widths *widths)
 {
+	char	*path;
 	size_t	i;
 
 	i = 0;
@@ -128,11 +129,14 @@ static void	print_directory_entries(t_ctx *ctx, const t_directory_list *director
 			*/
 			if (directory_list->items[i].stat_ok)
 			{
-				/*
-				* TODO paso 7: construir la ruta completa de los enlaces
-				* simbólicos para readlink() y liberar la memoria reservada
-				*/
-				print_long_format(ctx, directory_list->items[i].name, NULL, &directory_list->items[i].st, widths);
+				path = build_path(directory_list->directory_name, directory_list->items[i].name);
+				if (!path)
+				{
+					ctx->fatal = FATAL_NOMEM;
+					return ;
+				}
+				print_long_format(ctx, directory_list->items[i].name, path, &directory_list->items[i].st, widths);
+				free(path);
 			}
 		}
 		else

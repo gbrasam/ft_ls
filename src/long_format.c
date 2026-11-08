@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 13:10:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 15:25:30 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -527,6 +527,15 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 	char	date[32];
 	char	*target;
 
+	/* leer el destino antes de imprimir para evitar líneas incompletas */
+	target = NULL;
+	if (S_ISLNK(st->st_mode))
+	{
+		target = read_link_target(ctx, path, st);
+		if (!target)
+			return ;
+	}
+	
 	/* tipo y permisos */
 	format_file_mode(st->st_mode, permissions);
 	printf("%s ", permissions);
@@ -548,24 +557,13 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 	printf("%s ", date);
 	
 	/* nombre */
-	printf("%s\n", name);
+	printf("%s", name);
 
-	/* si enlace dinámico, imprimir " -> destino" (target) */
-	if (S_ISLNK(st->st_mode))
+	/* impresión del destino del enlace simbólico */
+	if (target)
 	{
-		target = read_link_target(ctx, path, st);
-		if (!target)
-		{
-			if (ctx->fatal != FATAL_NONE)
-			{
-				/* Interrumpir el procesamiento */
-			}
-			else
-			{
-				/* Error no fatal: continuar con otras entradas */
-			}
-		}
-		printf("->%s\n", target);
+		printf(" -> %s", target);
 		free(target);
 	}
+	printf("\n");
 }

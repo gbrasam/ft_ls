@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/04 12:35:20 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 15:25:15 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,7 @@ static DIR	*open_directory(t_ctx *ctx, const char *name)
  * 0: entrada almacenada
  * 1: error fatal de memoria
  */
-static int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_entry, t_directory_list *directory_list) 
+static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry_name, t_directory_list *directory_list) 
 {
 	t_directory_entry	*directory_entry;
 
@@ -50,7 +50,7 @@ static int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_
 
 	directory_entry = &directory_list->items[directory_list->count];
 
-	directory_entry->name = strdup(name_entry);																			/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
+	directory_entry->name = strdup(entry_name);																			/* necesitamos copiar la cadena porque 'name' procede de readdir() y su memoria puede reutilizarse en la siguiente lectura */
 	if (!directory_entry->name)
 	{
 		ctx->fatal = FATAL_NOMEM;
@@ -60,7 +60,7 @@ static int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_
 	directory_entry->stat_ok = 0;																						/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
 	if (ctx->opts.l || ctx->opts.t || ctx->opts.big_r)
 	{
-		if (load_stat(ctx, name_directory, directory_entry) == 1)
+		if (load_stat(ctx, directory_name, directory_entry) == 1)
 		{
 			free(directory_entry->name);
 			return (1);
@@ -108,7 +108,7 @@ static int	store_entry(t_ctx *ctx, const char *name_directory, const char *name_
  * entry->d_name[0] es el primer carácter de esa cadena
  *
  */
-static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_list *directory_list)
+static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_directory_list *directory_list)
 {
 	struct dirent	*entry;
 
@@ -118,7 +118,7 @@ static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_li
 	{
 		if (ctx->opts.a || entry->d_name[0] != '.')																		/* aplicar filtro -a */
 		{
-			if (store_entry(ctx, name, entry->d_name, directory_list) == 1)												/* guardar entradas válidas */
+			if (store_entry(ctx, directory_name, entry->d_name, directory_list) == 1)									/* guardar entradas válidas */
 				return (1);
 		}
 		errno = 0;
@@ -127,7 +127,7 @@ static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_li
 	if (errno != 0)																										/* error de lectura */
 	{
 		fprintf(stderr, "%s: reading directory '%s': %s\n",
-			ctx->prog, name, strerror(errno));
+			ctx->prog, directory_name, strerror(errno));
 		ctx->status = 2;
 		return (1);
 	}
@@ -140,19 +140,19 @@ static int	read_directory(t_ctx *ctx, const char *name, DIR *dir, t_directory_li
 * 2. readdir()  → store_entry() guardar entradas
 * 3. closedir() → se ejecuta antes de ordenar e imprimir, lo que evitará acumular descriptores abiertos durante la futura recursividad
 */
-int	load_directory_entries(t_ctx *ctx, const char *name, t_directory_list *directory_list)
+int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_list *directory_list)
 {
 	DIR	*dir;
 	int	flag_read;
 
-	dir = open_directory(ctx, name);
+	dir = open_directory(ctx, directory_name);
 	if (!dir)
 		return (1);
-	flag_read = read_directory(ctx, name, dir, directory_list);
+	flag_read = read_directory(ctx, directory_name, dir, directory_list);
 	if (closedir(dir) == -1)																							/* closedir() se ejecuta después de cualquier lectura, incluso si read_directory() falla */
 	{
 		fprintf(stderr, "%s: closing directory '%s': %s\n",
-			ctx->prog, name, strerror(errno));
+			ctx->prog, directory_name, strerror(errno));
 		/*
      		* TODO etapa 8: verificar gravedad del error
 			* verificar frente a GNU ls qué código de salida

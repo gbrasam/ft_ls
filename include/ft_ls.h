@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 12:01:19 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/08 15:25:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -373,6 +373,7 @@ typedef struct s_directory_entry
 
 typedef struct s_directory_list
 {
+	const char			*directory_name;
 	t_directory_entry	*items;
 	size_t				count;      												/* entradas almacenadas */
 	size_t				capacity;   												/* espacio reservado, en número de entradas */
@@ -444,7 +445,7 @@ void	init_ctx(t_ctx *ctx, const char *prog);
 void	init_ops(t_operands *ops);
 void	init_operand_list(t_operand_list *operand_list);
 void	init_long_format_time(t_ctx *ctx);
-void	init_directory_list(t_directory_list *directory_list);
+void	init_directory_list(const char *directory_name, t_directory_list *directory_list);
 void	init_print_widths(t_print_widths *print_widths);
 
 /* parser.c */
@@ -463,7 +464,7 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* directory_entries.c */
 /* nivel de directorio individual-ciclo de vida de un directorio concreto */
-void	list_directory(t_ctx *ctx, const char *name);
+void	list_directory(t_ctx *ctx, const char *directory_name);
 
 /* load_directory_entries.c (open, read et store)*/
 int		load_directory_entries(t_ctx *ctx, const char *name, t_directory_list *directory_list);
@@ -474,7 +475,7 @@ void	handle_directory_entries(t_ctx *ctx, t_directory_list *directory_list);
 
 /* directory_entries_utils.c */
 int		calculate_capacity(size_t capacity, size_t *new_capacity);
-int		load_stat(t_ctx *ctx, const char *name_directory, t_directory_entry *directory_entry);
+int		load_stat(t_ctx *ctx, const char *directory_name, t_directory_entry *directory_entry);
 int		ensure_capacity(t_directory_list *directory_list);
 
 /* sort_directory.c */
