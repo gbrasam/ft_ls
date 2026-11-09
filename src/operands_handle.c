@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 17:50:20 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 18:45:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,28 +52,44 @@ static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 	}
 }
 
-/* ----------------------------------------------------------- handle_files ----------------------------------------------------------- */
+/* ----------------------------------------------------------- operand widths ----------------------------------------------------------- */
 
 /*
- * Solo se consideran los operandos OPS_FILE
- * OPS_DIRECTORY se procesan por separado
- * y OPS_ERROR no dispone de metadatos válidos
+ * Calcula los anchos para imprimir los operandos con -l.
+ *
+ * Incluye los metadatos de todos los operandos válidos,
+ * tanto OPS_FILE como OPS_DIRECTORY.
+ *
+ * Aunque los directorios no se imprimen en el bloque
+ * de archivos, sus metadatos influyen en los anchos
+ * de las columnas de ese bloque.
+ *
+ * OPS_ERROR queda excluido porque stat_ok == 0.
+ * Esta función solo calcula anchos; no imprime nada.
  */
-static void	prepare_files_widths(const t_operand_list *operand_list, t_print_widths *widths)
+static void	prepare_operand_widths(const t_operand_list *operand_list, t_print_widths *widths)
 {
 	size_t	i;
 
 	i = 0;
 	while (i < operand_list->count)
 	{
-		if (operand_list->items[i].kind == OPS_FILE)
+		if (operand_list->items[i].stat_ok)
 			update_print_widths(&operand_list->items[i].st, widths);
 		i++;
 	}
 }
 
+/* ------------------------------------------------------------ handle_files ------------------------------------------------------------ */
+
 /*
- * en los operandos, 'name' es tanto el nombre mostrado como la ruta del archivo
+ * Imprime únicamente los operandos OPS_FILE.
+ *
+ * En los operandos, name contiene la ruta original recibida
+ * por argumentos y también es el nombre que se muestra.
+ *
+ * Con -l utiliza los anchos calculados previamente,
+ * que incluyen los metadatos de OPS_FILE y OPS_DIRECTORY.
  */
 static void	print_files(t_ctx *ctx, const t_operand_list *operand_list, const t_print_widths *widths)
 {
@@ -103,7 +119,7 @@ static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
 	init_print_widths(&widths);
 	if (ctx->opts.l)
 	{
-		prepare_files_widths(operand_list, &widths);
+		prepare_operand_widths(operand_list, &widths);
 		prepare_size_widths(&widths);
 	}
 	print_files(ctx, operand_list, &widths);

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 12:10:27 by gebravo           #+#    #+#             */
-/*   Updated: 2026/10/31 12:10:50 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 18:30:20 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,131 +16,130 @@
  * Consulta los metadatos de una ruta y clasifica el operando.
  * Guarda el tipo, el error y los metadatos en t_operand_info.
  *
- * 1. PRIMERA COMPROBACIÓN: stat()
+ * 1. CASO ESPECIAL: ENLACE SIMBÓLICO CON -l
  *
- * stat() sigue los enlaces simbólicos y consulta los metadatos
- * del objeto al que apuntan.
+ * - stat() sigue los enlaces simbólicos y consulta su destino.
+ * - lstat() consulta el propio enlace, sin seguirlo.
+ *
+ * Si -l está activada:
+ * - Se intenta lstat() antes de stat().
+ * - Si lstat() funciona y S_ISLNK() confirma que es un enlace,
+ *   se clasifica como OPS_FILE y se retorna sin llamar a stat().
+ * - Se conservan los metadatos del propio enlace.
+ * - Si no es un enlace o lstat() falla, continúa la clasificación.
+ *
+ * Ejemplo: enlace -> carpeta/
+ * - Sin -l: se sigue el enlace y se lista la carpeta.
+ * - Con -l: se muestra "enlace -> carpeta/".
+ * - Con -l y enlace/: la barra final obliga a resolver el enlace
+ *   y se lista el directorio de destino.
+ *
+ * 2. CLASIFICACIÓN GENERAL: stat()
  *
  * stat(const char *path, struct stat *buf):
- * - path: ruta que se quiere consultar (info->name).
+ * - path: ruta que se consulta (info->name).
  * - buf: dirección donde se guardan los metadatos (&info->st).
- * - Devuelve 0 si tiene éxito y -1 si falla (establece errno).
+ * - Devuelve 0 si funciona y -1 si falla (establece errno).
  *
  * Si stat() funciona:
  * - Guarda inicialmente los metadatos en info->st.
  * - Si es un directorio, lo clasifica como OPS_DIRECTORY
- *   y conserva esos metadatos.
- * - En otro caso, utiliza lstat() para obtener los metadatos
- *   del propio operando y clasificarlo como OPS_FILE.
- * - Si lstat() falla, lo clasifica como OPS_ERROR.
+ *   y conserva los metadatos obtenidos con stat().
+ * - Si no es un directorio, llama a lstat() para obtener los
+ *   metadatos del propio operando y clasificarlo como OPS_FILE.
+ * - Si lstat() falla, se clasifica como OPS_ERROR.
  *
- * 2. SEGUNDA COMPROBACIÓN: lstat()
+ * 3. TRATAMIENTO DE ERRORES DE stat()
  *
- * lstat() consulta los metadatos del propio operando.
- * Si es un enlace simbólico, no sigue el enlace hasta su destino.
+ * Si stat() falla, se guarda inmediatamente errno en error,
+ * porque una llamada posterior a lstat() podría modificarlo.
  *
- * Se utiliza en dos situaciones:
- * - Si stat() funciona y el operando no es un directorio.
- * - Si stat() falla con ENOENT o ELOOP.
- *
- * Si stat() falla, se guarda primero errno en error, porque
- * una llamada posterior a lstat() podría modificar su valor.
- *
- * No todos los fallos de stat() significan que el operando no exista:
+ * No todos los fallos significan que el operando no exista:
  *
  * - ENOENT: no se encuentra la ruta o el destino del enlace.
  *   Ejemplo: roto -> inexistente.txt.
- *   stat("roto") falla porque el destino no existe, pero el
- *   propio enlace simbólico "roto" sí puede existir.
+ *   stat("roto") falla, pero el propio enlace puede existir.
  *
- * - ELOOP: se han encontrado demasiados enlaces simbólicos al
- *   resolver la ruta, por ejemplo, porque forman un ciclo.
+ * - ELOOP: demasiados enlaces simbólicos al resolver la ruta,
+ *   por ejemplo, porque forman un ciclo.
  *   El propio enlace puede seguir existiendo.
  *
  * - EACCES: permiso denegado al acceder a algún componente
- *   de la ruta. No debemos tratarlo como un enlace roto.
+ *   de la ruta. No se trata como un enlace roto.
  *
- * Si stat() falla, solo se intenta lstat() cuando el error
- * es ENOENT o ELOOP.
+ * Si stat() falla con ENOENT o ELOOP:
+ * - Se intenta lstat() para comprobar si el operando existe.
+ * - Si funciona, se clasifica como OPS_FILE y se conservan
+ *   los metadatos del propio operando.
+ * - Si falla, se clasifica como OPS_ERROR.
  *
- * - Si lstat() funciona, se clasifica como OPS_FILE y
- *   conserva los metadatos del propio operando en info->st.
- * - Si lstat() falla, se clasifica como OPS_ERROR.
- * - Para otros errores de stat(), como EACCES, no se llama
- *   a lstat() y se clasifica directamente como OPS_ERROR.
+ * Si stat() falla por otro motivo, como EACCES:
+ * - No se llama a lstat().
+ * - Se clasifica directamente como OPS_ERROR.
  *
- * Si stat() había fallado, info->err conserva su error original.
- * Si stat() funcionó pero lstat() falla, se conserva errno
- * correspondiente al fallo de lstat().
+ * Si stat() falla y no se recupera con lstat(), info->err
+ * conserva el error original de stat().
+ * Si stat() funciona pero lstat() falla posteriormente,
+ * info->err conserva el error de ese último lstat().
  *
- * 3. METADATOS: struct stat (info->st)
+ * 4. METADATOS: struct stat (info->st)
  *
- * - Los metadatos se guardan directamente en la estructura
- *   del operando, sin utilizar una estructura temporal.
- * - info->st.st_mode contiene el tipo de archivo y sus permisos.
- * - S_ISDIR(info->st.st_mode) devuelve un valor distinto de 0
- *   si es un directorio, y 0 en caso contrario.
- * - info->stat_ok indica si los metadatos son válidos (1) o no (0).
+ * - Los metadatos se guardan directamente en info->st.
+ * - st_mode contiene el tipo de archivo y sus permisos.
+ * - S_ISDIR(st_mode) identifica si es un directorio.
+ * - S_ISLNK(st_mode) identifica si es un enlace simbólico.
+ * - stat_ok indica si los metadatos son válidos (1) o no (0).
  *
  * IMPORTANTE:
- * - OPS_DIRECTORY conserva los metadatos obtenidos con stat().
- * - OPS_FILE guarda los metadatos obtenidos con lstat().
- * - Nunca debemos consultar info->st si stat_ok = 0.
+ * - OPS_DIRECTORY conserva los metadatos de stat().
+ * - OPS_FILE conserva los metadatos de lstat().
+ * - Nunca consultar info->st si stat_ok == 0.
  *
- * 4. RESULTADO DE LA CLASIFICACIÓN
+ * 5. RESULTADO DE LA CLASIFICACIÓN
  *
- * - OPS_DIRECTORY:
- *   stat() funciona y el objeto consultado es un directorio.
- *   stat_ok = 1 y err = 0.
+ * OPS_DIRECTORY:
+ * - stat() funciona y reconoce un directorio.
+ * - Incluye enlaces a directorios que se siguen sin -l.
+ * - stat_ok = 1 y err = 0.
  *
- * - OPS_FILE:
- *   stat() funciona y el objeto no es un directorio, o bien
- *   stat() falla con ENOENT/ELOOP y lstat() funciona.
- *   En ambos casos, lstat() debe funcionar.
- *   Incluye los enlaces simbólicos rotos.
- *   stat_ok = 1 y err = 0.
+ * OPS_FILE:
+ * - Con -l, lstat() reconoce un enlace simbólico.
+ * - O stat() funciona, no es directorio y lstat() funciona.
+ * - O stat() falla con ENOENT/ELOOP y lstat() funciona.
+ * - Incluye archivos normales y enlaces simbólicos rotos.
+ * - stat_ok = 1 y err = 0.
  *
- * - OPS_ERROR:
- *   stat() falla con un error distinto de ENOENT/ELOOP,
- *   o falla con ENOENT/ELOOP y también falla lstat(),
- *   o stat() funciona pero el posterior lstat() falla.
- *   stat_ok = 0 y err = error correspondiente.
+ * OPS_ERROR:
+ * - stat() falla con un error distinto de ENOENT/ELOOP.
+ * - O stat() falla con ENOENT/ELOOP y también falla lstat().
+ * - O stat() funciona pero el posterior lstat() falla.
+ * - stat_ok = 0 y err = error correspondiente.
  *
- * 5. TRATAMIENTO DE ENLACES SIMBÓLICOS (-t)
+ * 6. RELACIÓN CON LA ORDENACIÓN -t
  *
- * Para los operandos, GNU ls distingue según el destino:
+ * - OPS_DIRECTORY conserva los metadatos de stat(),
+ *   que corresponden al directorio de destino si es un enlace.
+ * - OPS_FILE conserva los metadatos de lstat(),
+ *   que corresponden al propio archivo o enlace.
  *
- * - Enlace a fichero: utiliza los metadatos del propio enlace.
- * - Enlace a directorio: utiliza los metadatos del destino.
+ * Así, la ordenación -t utiliza los metadatos almacenados
+ * según la clasificación del operando.
  *
- * Por tanto:
- * - stat() permite clasificar el operando siguiendo el enlace.
- * - OPS_DIRECTORY: conserva los metadatos obtenidos con stat().
- * - OPS_FILE: utiliza lstat() para guardar los metadatos
- *   del propio operando, sin seguir enlaces simbólicos.
- *
- * lstat() también funciona con archivos normales y devuelve
- * los mismos metadatos que stat() cuando no hay enlaces simbólicos.
- *
- * Podemos sustituir los metadatos obtenidos con stat() por
- * los de lstat() para todos los OPS_FILE, sin necesidad de
- * identificar expresamente los enlaces simbólicos.
- *
- * 6. PENDIENTE ETAPA 5: FORMATO LARGO (-l)
- *
- * Actualmente, los enlaces simbólicos a directorios se siguen
- * y se clasifican como OPS_DIRECTORY.
- *
- * Con -l, sin opciones que fuercen el seguimiento de enlaces,
- * GNU ls muestra el propio enlace como operando, sin recorrer
- * el directorio de destino.
- *
- * Habrá que adaptar la clasificación según las opciones
- * y utilizar los metadatos del propio enlace.
+ * El uso de -l modifica la clasificación de los enlaces
+ * simbólicos a directorios: se muestran como OPS_FILE
+ * en lugar de recorrer su destino.
  */
-static void	get_operand_info(t_operand_info	*info)
+static void	get_operand_info(t_ctx *ctx, t_operand_info	*info)
 {
 	int	error;
+
+	if (ctx->opts.l && lstat(info->name, &info->st) == 0 && S_ISLNK(info->st.st_mode))
+	{
+		info->stat_ok = 1;
+		info->err = 0;
+		info->kind = OPS_FILE;
+		return ;
+	}
 
 	if (stat(info->name, &info->st) == 0)
 	{
@@ -199,7 +198,7 @@ static void	get_operand_info(t_operand_info	*info)
  * - OPS_ERROR: no dispone de metadatos válidos
  *
  * Modifica operand_list a través de su puntero
- * No devuelve una colección nueva ni reserva memoria adicional
+ * No devuelve una colección nueva ni realiza reservas de memoria
  *
  * No imprime ni ordena: conserva el orden original de los operandos
  */
@@ -207,7 +206,6 @@ void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list
 {
 	size_t	i;
 
-	(void)ctx;
 	i = 0;
 	while (i < operand_list->count)
 	{
@@ -215,7 +213,7 @@ void	classify_operands(t_ctx *ctx, t_operands *ops, t_operand_list *operand_list
 			operand_list->items[i].name = ".";
 		else
 			operand_list->items[i].name = ops->items[i];
-		get_operand_info(&operand_list->items[i]);
+		get_operand_info(ctx, &operand_list->items[i]);
 		i++;
 	}
 }

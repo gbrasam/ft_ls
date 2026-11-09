@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 13:25:55 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 18:30:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -405,12 +405,13 @@ void	prepare_size_widths(t_print_widths *widths)
  * Para fechas recientes:
  *   Nov  2 17:30
  *
- * Para fechas antiguas:
- *   Nov  2 2025
+ * Para fechas antiguas o futuras:
+ *   Nov  2  2025
  *
  * GNU ls considera reciente una fecha posterior al límite
- * aproximado de seis meses y que no esté más de una hora
- * en el futuro respecto a la hora actual.
+ * aproximado de seis meses y no posterior a la hora actual.
+ * Cualquier fecha futura, aunque sea por segundos,
+ * se considera no reciente y muestra el año.
  *
  * Las fechas fuera de ese intervalo muestran el año en lugar de la hora.
  *
@@ -727,7 +728,7 @@ static char	get_dirent_type_char(unsigned char d_type)
 		return ('p');
 	if (d_type == DT_SOCK)
 		return ('s');
-	return ('?');										/* Si d_type == DT_UNKNOWN o recibimos un valor no reconocido, devolvemos '?' porque no podemos determinar el tipo y esta función se utiliza precisamente cuando lstat() ha fallado y, por tanto, no disponemos de metadatos válidos */
+	return ('?');																				/* Si d_type == DT_UNKNOWN o recibimos un valor no reconocido, devolvemos '?' porque no podemos determinar el tipo y esta función se utiliza precisamente cuando lstat() ha fallado y, por tanto, no disponemos de metadatos válidos */
 }
 
 /*
@@ -788,7 +789,7 @@ void	print_unknown_long_format(const char *entry_name, unsigned char d_type, con
 
 	/* 0.- print tipo y permisos */
 	dirent_type = get_dirent_type_char(d_type);
-	printf("%c????????? ", dirent_type);												/* 1 carácter de tipo obtenido de d_type + 9 permisos desconocidos */
+	printf("%c????????? ", dirent_type);														/* 1 carácter de tipo obtenido de d_type + 9 permisos desconocidos */
 
 	/* 1.- print número de enlaces duros */
 	/* ? -> st_nlink desconocido */
