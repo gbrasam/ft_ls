@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 18:30:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 12:50:59 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -124,6 +124,18 @@ static void	prepare_entries_info(const t_directory_list *directory_list, t_print
 	}
 }
 
+/*
+ * En formato largo (-l), debemos imprimir todas las entradas
+ * almacenadas en directory_list, aunque lstat() haya fallado.
+ *
+ * - stat_ok == 1: imprimir con los metadatos válidos de st.
+ * - stat_ok == 0: imprimir el tipo indicado por d_type
+ *   (si se conoce) y '?' para los metadatos desconocidos.
+ *
+ * Nunca consultar st cuando stat_ok == 0.
+ * 
+ * fprintf(stderr, "DEBUG: name=%s, stat_ok=%d\n", directory_list->items[i].name, directory_list->items[i].stat_ok);
+ */
 static void	print_directory_entries(t_ctx *ctx, const t_directory_list *directory_list, const t_print_widths *widths)
 {
 	char	*path;
@@ -136,10 +148,6 @@ static void	print_directory_entries(t_ctx *ctx, const t_directory_list *director
 			return ;
 		if (ctx->opts.l)
 		{
-			/*
-			* TODO paso 8: imprimir las entradas con stat_ok == 0
-			* fprintf(stderr, "DEBUG: name=%s, stat_ok=%d\n", directory_list->items[i].name, directory_list->items[i].stat_ok);
-			*/
 			if (directory_list->items[i].stat_ok)
 			{
 				path = build_path(directory_list->directory_name, directory_list->items[i].name);
@@ -151,6 +159,8 @@ static void	print_directory_entries(t_ctx *ctx, const t_directory_list *director
 				print_long_format(ctx, directory_list->items[i].name, path, &directory_list->items[i].st, widths);
 				free(path);
 			}
+			else
+				print_unknown_long_format(directory_list->items[i].name, directory_list->items[i].d_type, widths);
 		}
 		else
 			printf("%s\n", directory_list->items[i].name);

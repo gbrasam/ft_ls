@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 18:30:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 13:25:55 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -334,7 +334,8 @@ void	prepare_size_widths(t_print_widths *widths)
 }
 
 /*
- * Imprime una entrada en el formato largo de ls (-l).
+ * Imprime una entrada en el formato largo de ls (-l) cuando sus metadatos (st) son válidos
+ * Imprime utilizando los metadatos de lstat()
  *
  * Cada entrada ocupa una línea y muestra sus metadatos además del nombre.
  *
@@ -635,7 +636,7 @@ void	prepare_size_widths(t_print_widths *widths)
  * -rw-rw-r-- 1 gebravo gebravo    1 Nov  4 14:40 archivo1
  * -rw-rw-r-- 1 gebravo gebravo 5000 Nov  4 14:40 archivo2
  */
-void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths)
+void	print_long_format(t_ctx *ctx, const char *entry_name, const char *path, const struct stat *st, const t_print_widths *widths)
 {
 	char	permissions[11];
 	char	date[32];
@@ -677,7 +678,7 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 	printf("%s ", date);
 	
 	/* 6.- print nombre */
-	printf("%s", name);
+	printf("%s", entry_name);
 
 	/* 7.- print impresión del destino del enlace simbólico */
 	if (target)
@@ -685,5 +686,145 @@ void	print_long_format(t_ctx *ctx, const char *name, const char *path, const str
 		printf(" -> %s", target);
 		free(target);
 	}
+	printf("\n");
+}
+
+/*
+ * La función recibe el valor numérico de d_type
+ * y devuelve el carácter que debemos imprimir en la primera posición del formato largo (-l)
+ * 
+ * En Linux, d_type es de tipo unsigned char.
+ * Es un valor entero sin signo, no un carácter de texto.
+ *
+ * VALORES HABITUALES DE d_type:
+ *
+ *   DT_REG     Archivo regular                 (-)
+ *   DT_DIR     Directorio                      (d)
+ *   DT_LNK     Enlace simbólico                (l)
+ *   DT_CHR     Dispositivo de caracteres       (c)
+ *   DT_BLK     Dispositivo de bloques          (b)
+ *   DT_FIFO    Tubería con nombre (FIFO)       (p)
+ *   DT_SOCK    Socket                          (s)
+ *   DT_UNKNOWN Tipo desconocido                (?)
+ *
+ * Los caracteres entre paréntesis son los que representan
+ * esos tipos en la primera posición del formato largo (-l).
+ * No son los valores numéricos de las constantes DT_*.
+ */
+static char	get_dirent_type_char(unsigned char d_type)
+{
+	if (d_type == DT_REG)
+		return ('-');
+	if (d_type == DT_DIR)
+		return ('d');
+	if (d_type == DT_LNK)
+		return ('l');
+	if (d_type == DT_CHR)
+		return ('c');
+	if (d_type == DT_BLK)
+		return ('b');
+	if (d_type == DT_FIFO)
+		return ('p');
+	if (d_type == DT_SOCK)
+		return ('s');
+	return ('?');										/* Si d_type == DT_UNKNOWN o recibimos un valor no reconocido, devolvemos '?' porque no podemos determinar el tipo y esta función se utiliza precisamente cuando lstat() ha fallado y, por tanto, no disponemos de metadatos válidos */
+}
+
+/*
+ * Imprime una entrada en formato largo (-l) cuando lstat()
+ * no ha proporcionado metadatos válidos (stat_ok == 0).
+ *
+ * Ejemplo de salida:
+ *
+ * l????????? ? ? ? ?            ? enlace
+ *
+ * - Utiliza d_type para representar el tipo de archivo,
+ *   si se conoce. Si es desconocido, imprime '?'.
+ * - Imprime '?' para los permisos y demás metadatos desconocidos.
+ * - Imprime el nombre conservado desde readdir().
+ * - No intenta consultar ni imprimir el destino de un enlace
+ *   simbólico (-> destino).
+ *
+ * No accede a struct stat porque sus metadatos no son válidos.
+ * 
+ * El ejemplo de salida es ilustrativo: los espacios
+ * dependen de los anchos calculados para cada listado.
+ *
+ * ALINEACIÓN DE LOS CAMPOS DESCONOCIDOS
+ *
+ * Los anchos almacenados en t_print_widths no corresponden
+ * a una entrada concreta, sino a los anchos máximos de las
+ * columnas para todo el listado del directorio.
+ *
+ * Se calculan previamente recorriendo las entradas cuyos
+ * metadatos son válidos (stat_ok == 1).
+ *
+ * Por tanto, aunque lstat() haya fallado para esta entrada,
+ * los anchos pueden ser mayores que 0 si existen otras
+ * entradas con metadatos válidos en el mismo directorio.
+ *
+ * Utilizamos esos anchos para alinear los interrogantes (?)
+ * con los valores de las demás entradas del listado.
+ *
+ * Ejemplo para la columna de enlaces duros:
+ *
+ * - widths->nlink == 3: '?' alineado a la derecha en 3 posiciones.
+ * - widths->nlink == 0: '?' ocupa igualmente 1 posición.
+ *
+ * Si todas las entradas tienen stat_ok == 0, los anchos
+ * conservan su valor inicial (0).
+ * printf("%*c", 0, '?') sigue imprimiendo un carácter '?'.
+ *
+ * No es necesario modificar t_print_widths ni recalcular
+ * los anchos: la propia impresión contempla el ancho mínimo
+ * necesario para mostrar cada interrogante.
+ *
+ * La fecha utiliza un ancho fijo de 12 caracteres,
+ * conforme al formato actual de fechas (LC_ALL=C).
+ */
+void	print_unknown_long_format(const char *entry_name, unsigned char d_type, const t_print_widths *widths)
+{
+	char	dirent_type;
+
+	/* 0.- print tipo y permisos */
+	dirent_type = get_dirent_type_char(d_type);
+	printf("%c????????? ", dirent_type);												/* 1 carácter de tipo obtenido de d_type + 9 permisos desconocidos */
+
+	/* 1.- print número de enlaces duros */
+	/* ? -> st_nlink desconocido */
+	printf("%*c ", (int)widths->nlink, '?');
+
+	/* 2.- print propietario */
+	/* ? -> st_uid desconocido (nombre o UID) */
+	/* ¡! '-*' alineación a la izquierda */
+	printf("%-*c ", (int)widths->owner, '?');
+
+	/* 3.- print grupo */
+	/* ? -> st_gid desconocido (nombre o GID) */
+	/* ¡! '-*' alineación a la izquierda */
+	printf("%-*c ", (int)widths->group, '?');
+
+	/* 4.- print tamaño del archivo o identificador del dispositivo */
+	/*
+ 	 * prepare_size_widths() ya ha ajustado 'widths->size' al ancho
+ 	 * necesario para tamaños normales e identificadores de dispositivos.
+ 	 *
+ 	 * Como no disponemos de st_size ni de major/minor, imprimimos
+ 	 * un único '?' alineado a la derecha en esa columna,
+ 	 * aunque d_type indique DT_CHR o DT_BLK.
+ 	*/
+	printf("%*c ", (int)widths->size, '?');
+
+	/* 5.- print fecha de modificación */
+	/* ? -> st_mtim desconocido */
+	printf("%12c ", '?');																/* la fecha utiliza un ancho fijo de 12 caracteres, conforme al formato actual de fechas (LC_ALL=C) */
+
+	/* 6.- print nombre */
+	/* entry_name -> nombre conservado desde readdir() */
+	printf("%s", entry_name);
+	
+	/* 7.- print impresión del destino del enlace simbólico */
+	/* No se imprime "-> destino": no disponemos de un destino consultado */
+
 	printf("\n");
 }

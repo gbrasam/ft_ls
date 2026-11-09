@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 18:38:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 12:50:50 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -250,7 +250,7 @@ typedef struct s_operands
  * -----------------------------------------------------------------------------------
  * mode_t           st_mode     Tipo de archivo y permisos   %jo      (uintmax_t) octal sin signo
  * off_t            st_size     Tamaño lógico en bytes       %jd      (intmax_t) decimal con signo
- * dev_t            st_rdev     Identificador de dispositivo %ju      major() / minor()
+ * dev_t            st_rdev     Identificador de dispositivo N/A      major() / minor()
  * struct timespec  st_mtim     Última modificación          N/A      localtime_r()
  * uid_t            st_uid      ID del propietario           %ju      (uintmax_t) decimal sin signo
  * gid_t            st_gid      ID del grupo                 %ju      (uintmax_t) decimal sin signo
@@ -261,8 +261,8 @@ typedef struct s_operands
  * %ju  -> Entero decimal sin signo (uintmax_t).
  * %jo  -> Entero octal sin signo (uintmax_t).
  *
- * <inttypes.h> proporciona los tipos intmax_t y uintmax_t,
- * y los formatos correspondientes.
+ * <stdint.h> define intmax_t y uintmax_t.
+ * <inttypes.h> proporciona también las macros de formato PRI...
  *
  * TIPOS DE DATOS Y CÁLCULO DE DÍGITOS
  *
@@ -382,13 +382,13 @@ typedef struct s_operands
  * Los metadatos de cada entrada se obtienen mediante lstat().
  *
  * lstat(const char *path, struct stat *buf):
- * - path: ruta completa de la entrada que queremos consultar.
+ * - path: ruta de la entrada que queremos consultar.
  * - buf: dirección de la estructura donde guardar los metadatos.
  * - Devuelve 0 si tiene éxito.
  * - Devuelve -1 si falla y establece errno.
  *
  * Para consultar una entrada de un directorio, construimos
- * su ruta completa mediante build_path().
+ * su ruta mediante build_path().
  *
  * Ejemplo:
  * - Directorio: "src"
@@ -418,28 +418,116 @@ typedef struct s_operands
  * Por tanto, no debemos confundir la obtención de metadatos
  * de una entrada con la clasificación de los operandos.
  *
- * VALIDEZ DE LOS METADATOS: stat_ok
+ * TIPO DE ENTRADA: d_type
  *
- * stat_ok indica si los metadatos de la entrada son válidos.
+ * readdir() devuelve un puntero a struct dirent, que contiene,
+ * entre otros campos, el nombre (d_name) y el tipo (d_type).
  *
- * - stat_ok = 1:
- *   lstat() ha tenido éxito y st contiene datos válidos.
+ * En Linux, d_type es de tipo unsigned char.
+ * Es un valor entero sin signo, no un carácter de texto.
  *
- * - stat_ok = 0:
- *   Todavía no se ha llamado a lstat() o la llamada ha fallado.
+ * VALORES HABITUALES DE d_type:
+ *
+ *   DT_REG     Archivo regular                 (-)
+ *   DT_DIR     Directorio                      (d)
+ *   DT_LNK     Enlace simbólico                (l)
+ *   DT_CHR     Dispositivo de caracteres       (c)
+ *   DT_BLK     Dispositivo de bloques          (b)
+ *   DT_FIFO    Tubería con nombre (FIFO)       (p)
+ *   DT_SOCK    Socket                          (s)
+ *   DT_UNKNOWN Tipo desconocido                (?)
+ *
+ * Los caracteres entre paréntesis son los que representan
+ * esos tipos en la primera posición del formato largo (-l).
+ * No son los valores numéricos de las constantes DT_*.
+ *
+ * LIMITACIONES DE d_type:
+ *
+ * d_type no siempre permite conocer el tipo de entrada.
+ * Algunos sistemas de archivos devuelven DT_UNKNOWN.
+ *
+ * Además, d_type no contiene permisos, propietario, grupo,
+ * tamaño ni fechas. Para obtenerlos necesitamos lstat().
+ *
+ * ¿POR QUÉ GUARDAMOS d_type?
+ *
+ * readdir() puede encontrar una entrada, pero lstat() puede
+ * fallar después, por ejemplo, si otro proceso elimina
+ * el archivo entre ambas llamadas.
+ *
+ * Si lstat() falla, no disponemos de metadatos válidos en st,
+ * pero podemos conservar el nombre y el tipo obtenido
+ * previamente mediante readdir().
+ *
+ * Por eso guardamos d_type en t_directory_entry.
+ *
+ * No guardamos toda la estructura struct dirent:
+ * únicamente copiamos los datos que necesitamos.
+ *
+ * - name: copia del nombre obtenido de d_name.
+ * - d_type: copia del tipo indicado por readdir().
+ *
+ * Esto permite representar el tipo en ls -l cuando sea
+ * conocido, aunque los demás campos sean desconocidos.
+ *
+ * Ejemplo:
+ *
+ *   name    = "archivo.txt"
+ *   d_type  = DT_REG
+ *   stat_ok = 0
+ *
+ * readdir() encontró "archivo.txt" y lo identificó como
+ * archivo regular, pero lstat() no proporcionó sus metadatos.
+ *
+ * Podemos utilizar '-' como carácter de tipo y '?' para
+ * representar los permisos y otros datos desconocidos.
+ *
+ * Si d_type == DT_UNKNOWN, tampoco conocemos el tipo
+ * y utilizamos '?' en la primera posición.
  *
  * IMPORTANTE:
- * Nunca debemos utilizar los campos de entry->st
- * cuando entry->stat_ok == 0.
+ *
+ * d_type refleja la información obtenida por readdir().
+ * Puede quedar desactualizado si la entrada cambia.
+ *
+ * Si lstat() tiene éxito, utilizamos st_mode para determinar
+ * el tipo real observado por esa llamada.
+ *
+ * VALIDEZ DE LOS METADATOS: stat_ok
+ *
+ * stat_ok indica si hemos obtenido correctamente los
+ * metadatos de una entrada mediante lstat().
+ *
+ * - stat_ok = 1:
+ *   lstat() ha tenido éxito.
+ *   entry->st contiene metadatos válidos.
+ *   Podemos consultar sus campos y obtener el tipo de st_mode.
+ *
+ * - stat_ok = 0:
+ *   lstat() todavía no se ha ejecutado o ha fallado.
+ *   No podemos utilizar los campos de entry->st.
+ *   Conservamos el nombre y d_type obtenidos de readdir().
+ *
+ * IMPORTANTE:
+ *
+ * stat_ok no indica si readdir() encontró la entrada.
+ * Indica si lstat() consiguió obtener sus metadatos.
+ *
+ * Nunca debemos utilizar entry->st cuando stat_ok == 0.
  *
  * Esto afecta especialmente al cálculo de anchos de -l,
- * al ordenamiento por fecha (-t) y a la recursividad (-R).
+ * a la ordenación por fecha (-t) y a la recursividad (-R).
+ *
+ * En el formato largo (-l), si stat_ok == 0, podemos
+ * utilizar d_type para representar el tipo cuando sea
+ * conocido y '?' para los metadatos no disponibles.
  */
 typedef struct s_directory_entry
 {
-	char		*name;
-	struct stat	st;
-	int			stat_ok;															/* 1: st válido; 0: lstat() no llamado o fallido */
+	char			*name;
+	struct stat		st;
+	int				stat_ok;														/* 1: st válido; 0: lstat() no llamado o fallido */
+	unsigned char	d_type;															/* tipo devuelto por readdir(); DT_UNKNOWN si se desconoce */
 }	t_directory_entry;
 
 typedef struct s_directory_list
@@ -562,7 +650,10 @@ void	sort_operands(t_ctx *ctx, t_operand_list *operand_list);
 void	update_print_widths(const struct stat *st, t_print_widths *widths);
 void	prepare_size_widths(t_print_widths *widths);
 /* fase 2: impresión del formato largo */
-void	print_long_format(t_ctx *ctx, const char *name, const char *path, const struct stat *st, const t_print_widths *widths);
+/* 2a.- si metadatos (st) válidos - imprime utilizando los metadatos de lstat() */
+void	print_long_format(t_ctx *ctx, const char *entry_name, const char *path, const struct stat *st, const t_print_widths *widths);
+/* 2b.- si metadatos (st) NO válidos - d_type y ? para los metadatos desconocidos */
+void	print_unknown_long_format(const char *entry_name, unsigned char d_type, const t_print_widths *widths);
 
 /* long_format_utils.c */
 size_t	count_digits(size_t value);

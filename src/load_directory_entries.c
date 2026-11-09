@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 15:25:15 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 11:50:35 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,17 +28,24 @@ static DIR	*open_directory(t_ctx *ctx, const char *name)
 }
 
 /*
- * almacena una entrada del directorio en el array dinámico
+ * Almacena una entrada del directorio en el array dinámico.
  *
- * - amplía la capacidad cuando el array está lleno
- * - copia el nombre porque readdir() puede reutilizar su memoria
- * - obtiene metadatos solo si alguna opción los necesita (-l, -t y -R)
+ * - Amplía la capacidad cuando el array está lleno.
+ * - Copia el nombre mediante strdup(), porque readdir()
+ *   puede reutilizar su memoria.
+ * - Guarda d_type para conservar el tipo indicado por readdir(),
+ *   incluso si posteriormente falla lstat().
+ * - Inicializa stat_ok a 0 porque todavía no tenemos
+ *   metadatos válidos.
+ * - Obtiene los metadatos mediante lstat() solo cuando alguna
+ *   opción los necesita (-l, -t o -R).
+ * - Incrementa count únicamente si la entrada se ha almacenado.
  *
- * devuelve:
- * 0: entrada almacenada
- * 1: error fatal de memoria
+ * Retorno:
+ *   0: entrada almacenada correctamente.
+ *   1: error fatal de memoria.
  */
-static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry_name, t_directory_list *directory_list) 
+static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry_name, unsigned char entry_type, t_directory_list *directory_list) 
 {
 	t_directory_entry	*directory_entry;
 
@@ -58,6 +65,7 @@ static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry
 	}
 
 	directory_entry->stat_ok = 0;																						/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
+	directory_entry->d_type = entry_type;																				/* conservar el tipo indicado por readdir() */
 	if (ctx->opts.l || ctx->opts.t || ctx->opts.big_r)
 	{
 		if (load_stat(ctx, directory_name, directory_entry) == 1)
@@ -89,8 +97,13 @@ static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry
  *   d_type: tipo de entrada (DT_DIR, DT_REG, etc.)
  *
  * d_type puede valer DT_UNKNOWN, por lo que no siempre permite
- * determinar el tipo. Cuando sea necesario, se consulta mediante
- * stat() o lstat()
+ * determinar el tipo de entrada.
+ *
+ * Guardamos d_type en nuestra estructura porque lstat() puede
+ * fallar después de que readdir() haya encontrado la entrada.
+ * Así conservamos el tipo indicado por readdir(), si se conoce.
+ *
+ * Para obtener los metadatos de las entradas utilizamos lstat().
  *
  * readdir() devuelve NULL tanto al finalizar el directorio como
  * si se produce un error. Para distinguir ambos casos:
@@ -101,6 +114,7 @@ static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry
  * La memoria devuelta por readdir() no nos pertenece y puede
  * reutilizarse en llamadas posteriores. Por eso, store_entry()
  * copia el nombre con strdup() para conservarlo en list
+ * y guarda el valor de d_type en nuestra estructura.
  *
  * ctx->opts.a || entry->d_name[0] != '.'
  * ctx->opts.a vale 1 cuando el usuario ha indicado -a
@@ -118,7 +132,7 @@ static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_di
 	{
 		if (ctx->opts.a || entry->d_name[0] != '.')																		/* aplicar filtro -a */
 		{
-			if (store_entry(ctx, directory_name, entry->d_name, directory_list) == 1)									/* guardar entradas válidas */
+			if (store_entry(ctx, directory_name, entry->d_name, entry->d_type, directory_list) == 1)					/* almacenar la entrada seleccionada ¡! una entrada puede almacenarse aunque lstat() falle y stat_ok quede a 0 */
 				return (1);
 		}
 		errno = 0;
