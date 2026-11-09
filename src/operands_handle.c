@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 15:55:08 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 17:50:20 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -127,7 +127,7 @@ static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 		if (ctx->fatal != FATAL_NONE)
 			return ;
 		if (operand_list->items[i].kind == OPS_DIRECTORY)
-			list_directory(ctx, operand_list->items[i].name);
+			list_directory(ctx, operand_list->items[i].name, true);
 		i++;
 	}
 }

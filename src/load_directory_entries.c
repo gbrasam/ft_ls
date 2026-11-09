@@ -6,22 +6,24 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 15:25:38 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 17:50:28 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
-static DIR	*open_directory(t_ctx *ctx, const char *name)
+static DIR	*open_directory(t_ctx *ctx, const char *name, bool is_operand)
 {
 	DIR	*dir;
 
 	dir = opendir(name);
 	if (!dir)
 	{
-		fprintf(stderr, "%s: cannot open directory '%s': %s\n",
-			ctx->prog, name, strerror(errno));
-		ctx->status = 2;
+		fprintf(stderr, "%s: cannot open directory '%s': %s\n", ctx->prog, name, strerror(errno));
+		if (is_operand)
+			ctx->status = 2;
+		else if (ctx->status != 2)
+			ctx->status = 1;
 		return (NULL);
 	}
 	return (dir);
@@ -35,10 +37,18 @@ static DIR	*open_directory(t_ctx *ctx, const char *name)
  *   puede reutilizar su memoria.
  * - Guarda d_type para conservar el tipo indicado por readdir(),
  *   incluso si posteriormente falla lstat().
- * - Inicializa stat_ok a 0 porque todavía no tenemos
- *   metadatos válidos.
- * - Obtiene los metadatos mediante lstat() solo cuando alguna
- *   opción los necesita (-l, -t o -R).
+ * - Inicializa stat_ok a 0: los metadatos todavía no se han
+ *   obtenido y puede que no sea necesario consultarlos.
+ * - Obtiene los metadatos mediante lstat() cuando:
+ *   - Está activada -l (formato largo).
+ *   - Está activada -t (ordenación por fecha).
+ *   - Está activada -R y d_type == DT_UNKNOWN,
+ *     para determinar si la entrada es un directorio.
+ * - Si d_type proporciona el tipo y solo está activada -R,
+ *   no necesita llamar a lstat().
+ * - Si d_type == DT_UNKNOWN y lstat() falla, la entrada
+ *   no se recorrerá durante -R, porque no se puede
+ *   confirmar que sea un directorio.
  * - Incrementa count únicamente si la entrada se ha almacenado.
  *
  * Retorno:
@@ -66,7 +76,7 @@ static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry
 
 	directory_entry->stat_ok = 0;																						/* inicializamos stat_ok a 0 antes de llamar a lstat() (los metadatos no son válidos hasta que lstat() tenga éxito) */
 	directory_entry->d_type = entry_type;																				/* conservar el tipo indicado por readdir() */
-	if (ctx->opts.l || ctx->opts.t || ctx->opts.big_r)
+	if (ctx->opts.l || ctx->opts.t || (ctx->opts.big_r && directory_entry->d_type == DT_UNKNOWN))
 	{
 		if (load_stat(ctx, directory_name, directory_entry) == 1)
 		{
@@ -149,104 +159,63 @@ static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_di
 }
 
 /*
-* workflow:
-* 1. opendir()
-* 2. readdir()  → store_entry() guardar entradas
-* 3. closedir() → se ejecuta antes de ordenar e imprimir, lo que evitará acumular descriptores abiertos durante la futura recursividad
-*/
-int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_list *directory_list)
+ * 'load_directory_entries' gestiona la apertura, lectura y cierre
+ * de un directorio, sin encargarse de ordenar ni imprimir.
+ *
+ * Workflow:
+ * 1. open_directory() -> opendir().
+ *    - Si falla, informa del error y devuelve 1.
+ *    - is_operand distingue el origen del directorio:
+ *      · true: operando original de argv.
+ *      · false: subdirectorio descubierto durante -R.
+ *    - Gravedad del error de apertura:
+ *      · Operando: status = 2.
+ *      · Subdirectorio: status = 1.
+ *      · Nunca reducir un status = 2 anterior.
+ *
+ * 2. read_directory() -> readdir() y store_entry().
+ *    - Lee y almacena las entradas visibles según -a.
+ *    - Devuelve el resultado de la lectura.
+ *
+ * 3. closedir().
+ *    - Se ejecuta incluso si read_directory() falla.
+ *    - Evita mantener descriptores abiertos durante -R.
+ *    - Si falla, informa del error y actualiza status
+ *      según is_operand, sin rebajar un status = 2.
+ *
+ * Devuelve:
+ * - 1 si falla la apertura.
+ * - En otro caso, devuelve el resultado de read_directory().
+ *
+ * La ordenación, impresión y recursividad se gestionan
+ * posteriormente desde list_directory().
+ *
+ * TODO (Etapa 8):
+ * - Revisar el tratamiento de errores de readdir(),
+ *   incluida la conservación de entradas leídas parcialmente.
+ * - Verificar frente a GNU ls la gravedad de los errores
+ *   de readdir() y closedir() en operandos y subdirectorios.
+ */
+int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_list *directory_list, bool is_operand)
 {
 	DIR	*dir;
 	int	flag_read;
 
-	dir = open_directory(ctx, directory_name);
+	dir = open_directory(ctx, directory_name, is_operand);
 	if (!dir)
 		return (1);
 	flag_read = read_directory(ctx, directory_name, dir, directory_list);
 	if (closedir(dir) == -1)																							/* closedir() se ejecuta después de cualquier lectura, incluso si read_directory() falla */
 	{
-		fprintf(stderr, "%s: closing directory '%s': %s\n",
-			ctx->prog, directory_name, strerror(errno));
-		/*
-     		* TODO etapa 8: verificar gravedad del error
-			* verificar frente a GNU ls qué código de salida
-     		* corresponde a un fallo de closedir()
-     		*
-     		* Actualmente se establece status = 2
-     		* Comprobar si la gravedad depende de que el directorio sea
-     		* un operando de argv o un subdirectorio encontrado con -R
-     		* No sobrescribir un status = 2 anterior con uno menor
-     	*/
-		ctx->status = 2;
+		fprintf(stderr, "%s: closing directory '%s': %s\n", ctx->prog, directory_name, strerror(errno));
+		if (is_operand)
+			ctx->status = 2;
+		else if (ctx->status != 2)
+			ctx->status = 1;
+		/* Pendiente de verificar-Equivalencia exacta con GNU ls ante un fallo de closedir() */
 	}
 	return (flag_read);
 }
-
-/*
- * Si closedir() falla, se informa del error y se establece
- * ctx->status = 2, pero se conserva el resultado de la lectura.
- *
- * Si las entradas ya se han leído correctamente, el fallo de
- * cierre no impide ordenarlas e imprimirlas.
- *
- * Decisión provisional: pendiente de contrastar con GNU ls.
- */
-
-/*
- * ¡! ETAPA 7 (-R): distinguir el origen del directorio
- *
- * PROBLEMA ACTUAL:
- * list_directory() solo recibe directorios procedentes de
- * los operandos de argv.
- *
- * Cuando implementemos -R, esta misma función también
- * recibirá subdirectorios descubiertos durante el recorrido.
- *
- * Es necesario distinguir ambos casos porque GNU ls puede
- * asignar distinta gravedad a los errores según el origen
- * del directorio.
- *
- * PROPUESTA: añadir un parámetro is_operand:
- *
- * - is_operand = 1:
- *   El directorio procede directamente de argv.
- *   Ejemplo: ./ft_ls directorio
- *
- * - is_operand = 0:
- *   El directorio se ha descubierto durante el recorrido -R.
- *   Ejemplo: ./ft_ls -R directorio
- *   y posteriormente se procesa directorio/subdirectorio.
- *
- * CRITERIO PREVISTO:
- * - Error de opendir() en un operando: status = 2.
- * - Error de opendir() en un subdirectorio: status = 1.
- * - No sobrescribir un status = 2 anterior con status = 1.
- *
- * PENDIENTE DE VERIFICACIÓN:
- * Comprobar frente a GNU ls los códigos correspondientes
- * a los errores de opendir() y readdir() en ambos casos.
- * No asumir que ambos tipos de error tienen necesariamente
- * la misma gravedad sin comprobarlo.
- *
- * IMPLEMENTACIÓN FUTURA:
- * - Añadir is_operand como parámetro de list_directory().
- * - Pasar is_operand a open_directory() para que pueda
- *   determinar la gravedad de los errores de apertura.
- * - Utilizar también esta información al tratar los
- *   errores de lectura de read_directory().
- * - Actualizar las llamadas desde handle_directories()
- *   y desde el futuro recorrido recursivo.
- *
- * IMPORTANTE:
- * is_operand pertenece a cada llamada de list_directory(),
- * no al contexto global t_ctx.
- *
- * Durante una misma ejecución pueden procesarse tanto
- * operandos originales como subdirectorios descubiertos.
- * El origen debe conservarse individualmente.
- *
- * Este cambio queda pendiente hasta implementar -R.
- */
 
  /*
  * TODO — ETAPA 8: errores recuperables durante la lectura del directorio.

@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 15:25:50 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 17:50:18 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -626,10 +626,10 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list);
 
 /* directory_entries.c */
 /* nivel de directorio individual-ciclo de vida de un directorio concreto */
-void	list_directory(t_ctx *ctx, const char *directory_name);
+void	list_directory(t_ctx *ctx, const char *directory_name, bool is_operand);
 
 /* load_directory_entries.c (open, read et store)*/
-int		load_directory_entries(t_ctx *ctx, const char *name, t_directory_list *directory_list);
+int		load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_list *directory_list, bool is_operand);
 
 /* display_directory_entries.c */
 /* ordena y coordina la presentación de las entradas */

@@ -6,12 +6,11 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 17:08:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 17:50:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
-
 
 static void	handle_subdirectories(t_ctx *ctx, t_directory_list *directory_list)
 {
@@ -23,8 +22,8 @@ static void	handle_subdirectories(t_ctx *ctx, t_directory_list *directory_list)
 	{
 		if (ctx->fatal != FATAL_NONE)
 			return ;
-		if (directory_list->items[i].stat_ok
-			&& S_ISDIR(directory_list->items[i].st.st_mode)
+		if (((directory_list->items[i].stat_ok && S_ISDIR(directory_list->items[i].st.st_mode))
+			|| (!directory_list->items[i].stat_ok && directory_list->items[i].d_type == DT_DIR))
 			&& strcmp(directory_list->items[i].name, ".") != 0
 			&& strcmp(directory_list->items[i].name, "..") != 0)
 		{
@@ -34,7 +33,7 @@ static void	handle_subdirectories(t_ctx *ctx, t_directory_list *directory_list)
 				ctx->fatal = FATAL_NOMEM;
 				return ;
 			}
-			list_directory(ctx, path);
+			list_directory(ctx, path, false);
 			free(path);
 		}
 		i++;
@@ -79,12 +78,12 @@ static void	handle_subdirectories(t_ctx *ctx, t_directory_list *directory_list)
  *  |
  *  +-- clean_directory_list()
  */
-void	list_directory(t_ctx *ctx, const char *directory_name)
+void	list_directory(t_ctx *ctx, const char *directory_name, bool is_operand)
 {
 	t_directory_list	directory_list;
 
 	init_directory_list(directory_name, &directory_list);
-	if (load_directory_entries(ctx, directory_name, &directory_list) == 0)
+	if (load_directory_entries(ctx, directory_name, &directory_list, is_operand) == 0)
 	{
 		if (ctx->printed)
 			printf("\n");
