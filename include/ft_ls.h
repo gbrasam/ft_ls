@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 12:50:50 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 15:25:50 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@
 #include <grp.h>																	/* getgrgid() información de un grupo por su GID */
 #include <sys/sysmacros.h>															/* major() y minor() */
 #include <inttypes.h>																/* no existe un especificador de printf() específico para blkcnt_t -> '%jd' es una forma portable de imprimir un entero con signo como blkcnt_t, convirtiéndolo a intmax_t */
+#include <stdbool.h>
 
 /**
  * t_argkind representa la clase de argumento de la línea de comandos.
@@ -144,7 +145,7 @@ typedef struct s_opts
  *			0 = ejecución correcta, sin errores
  *			1 = problema menor, p. ej. no poder acceder a un subdirectorio con -R
  *			2 = problema grave: opción no válida, operando de argv inaccesible, sin memoria
- * printed  indica si ya hemos impreso algo anteriormente
+ * printed  indica si ya hemos impreso algo (un bloque en stdout) anteriormente
  * headers  indica si debemos imprimir el nombre del directorio como cabecera
  * fatal    indica si ha ocurrido un error que obliga a detenerse
  * now      fecha y hora actual de referencia (struct timespec).
@@ -192,8 +193,8 @@ typedef struct s_ctx
 	const char		*invalid;
 	t_argkind		invalid_kind;
 	int				status;
-	int				printed;
-	int				headers;
+	bool			printed;
+	bool			headers;
 	t_fatal			fatal;
 	int				error_errno;													/* errno asociado al error fatal de la ejecución */
 	struct timespec	now;

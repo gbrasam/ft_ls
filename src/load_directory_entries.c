@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 11:50:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 15:25:38 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -182,8 +182,15 @@ int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_l
 	return (flag_read);
 }
 
-/* si closedir() falla, estableces ctx->status = 2 pero devuelves el resultado de la lectura.
-Es una decisión provisional válida mientras verificas el comportamiento de GNU ls */
+/*
+ * Si closedir() falla, se informa del error y se establece
+ * ctx->status = 2, pero se conserva el resultado de la lectura.
+ *
+ * Si las entradas ya se han leído correctamente, el fallo de
+ * cierre no impide ordenarlas e imprimirlas.
+ *
+ * Decisión provisional: pendiente de contrastar con GNU ls.
+ */
 
 /*
  * ¡! ETAPA 7 (-R): distinguir el origen del directorio
@@ -239,48 +246,91 @@ Es una decisión provisional válida mientras verificas el comportamiento de GNU
  * El origen debe conservarse individualmente.
  *
  * Este cambio queda pendiente hasta implementar -R.
- * */
+ */
 
  /*
-* ¡! ETAPA 8: distinguir errores de lectura y errores de memoria
-*
-* PROBLEMA ACTUAL:
-* read_directory() devuelve 0 si termina correctamente y 1 si falla,
-	 * pero no distingue la causa del fallo:
-	 *
-	 * - flag_read = 0: lectura completa. Ordenar e imprimir las entradas
-	 * - flag_read = 1: puede significar dos situaciones diferentes:
-	 *
-	 *   1. Error de readdir() (recuperable):
-	 *      No se ha podido completar la lectura del directorio, pero
-	 *      podemos ordenar e imprimir las entradas ya almacenadas
-	 *      Debemos informar del error y actualizar ctx->status
-	 *
-	 *   2. Error de memoria (fatal):
-	 *      Ha fallado una reserva de memoria (realloc(), strdup() o
-	 *      build_path()). No debemos continuar el procesamiento normal
-	 *      ctx->fatal = FATAL_NOMEM y debemos liberar la memoria reservada
-	 *
-	 * SOLUCIÓN PENDIENTE:
-	 * Modificar read_directory() para distinguir ambos errores:
-	 *
-	 * - return (0): lectura completada correctamente.
-	 * - return (1): error de lectura recuperable (readdir())
-	 * - return (2): error fatal de memoria
-	 *
-	 * Estos valores son códigos internos de read_directory(), no deben
-	 * confundirse con ctx->status, que representa el código de salida
-	 * global del programa
-	 *
-	 * En list_directory():
-	 * - Resultado 0: ordenar e imprimir
-	 * - Resultado 1: informar del error, ordenar e imprimir lo ya leído
-	 * - Resultado 2: no imprimir; liberar memoria y detener el
-	 *   procesamiento normal
-	 *
-	 * TBD ctx->fatal, también podríamos utilizarlo para distinguir los errores
-	 * sin introducir tres valores de retorno [ELEGIDO]
-	 *
-	 * En todos los casos debemos cerrar el directorio y liberar
-	 * la memoria de la lista.
-	*/
+ * TODO — ETAPA 8: errores recuperables durante la lectura del directorio.
+ *
+ * PROBLEMA ACTUAL
+ *
+ * load_directory_entries() devuelve:
+ * - 0: lectura completada y sin error fatal.
+ * - 1: no se puede continuar con el listado.
+ *
+ * Actualmente, si readdir() falla después de haber leído algunas
+ * entradas, se descartan de la impresión las entradas almacenadas.
+ *
+ * Sin embargo, hay que distinguir tres situaciones:
+ *
+ * 1. ERROR DE APERTURA — opendir()
+ *    - No se ha podido abrir el directorio.
+ *    - Informar del error y actualizar ctx->status.
+ *    - No imprimir cabecera ni entradas.
+ *    - No es un error fatal.
+ *
+ * 2. ERROR DE LECTURA — readdir()
+ *    - El directorio se ha abierto correctamente.
+ *    - La lectura se interrumpe antes de terminar.
+ *    - Informar del error y actualizar ctx->status.
+ *    - Conservar las entradas almacenadas hasta ese momento.
+ *    - Ordenar e imprimir esas entradas y la cabecera, si procede.
+ *    - No es un error fatal.
+ *
+ * 3. ERROR DE MEMORIA — FATAL_NOMEM
+ *    - Falla una reserva de memoria durante el procesamiento
+ *      (realloc(), strdup() o build_path()).
+ *    - Establecer ctx->fatal = FATAL_NOMEM.
+ *    - No continuar el procesamiento normal ni imprimir el listado.
+ *    - Liberar los recursos reservados.
+ *
+ * DECISIÓN DE DISEÑO [ELEGIDA]
+ *
+ * Mantener ctx->fatal para identificar los errores fatales.
+ * No introducir tres códigos de retorno en read_directory().
+ *
+ * ctx->status representa el estado de salida global.
+ * ctx->fatal indica si debe detenerse el procesamiento normal.
+ *
+ * PENDIENTE DE RESOLVER
+ *
+ * Distinguir el fallo de opendir() del fallo recuperable de
+ * readdir(), ya que ambos pueden ocurrir con ctx->fatal == FATAL_NONE.
+ *
+ * No basta con comprobar únicamente ctx->fatal.
+ *
+ * REVISAR list_directory()
+ *
+ * Actualmente solo procesa el listado cuando:
+ *
+ *     load_directory_entries(...) == 0
+ *
+ * Esta condición deberá adaptarse para permitir:
+ *
+ * - Apertura fallida: no imprimir cabecera ni entradas.
+ * - Lectura completa: imprimir cabecera y entradas.
+ * - Lectura parcial: imprimir cabecera y entradas recuperadas.
+ * - Error fatal: no imprimir y detener el procesamiento normal.
+ *
+ * La cabecera solo se imprime cuando ctx->headers es true.
+ * Un directorio abierto y vacío también puede tener cabecera.
+ *
+ * LIMPIEZA DE RECURSOS
+ *
+ * - Cerrar el directorio siempre que opendir() haya tenido éxito.
+ * - Liberar la memoria de la lista en todos los caminos de salida.
+ *
+ * OTROS ERRORES YA CONTEMPLADOS
+ *
+ * - lstat() de una entrada: continuar la lectura; conservar
+ *   la entrada con stat_ok = 0 y actualizar ctx->status.
+ * - closedir() después de leer: informar del error y actualizar
+ *   ctx->status, sin descartar las entradas ya almacenadas.
+ *
+ * OBJETIVO
+ *
+ * Recuperar e imprimir las entradas disponibles ante un error
+ * de lectura no fatal, sin confundirlo con un fallo de apertura
+ * ni con un error fatal de memoria.
+ *
+ * No implementar durante la Etapa 6.
+ */

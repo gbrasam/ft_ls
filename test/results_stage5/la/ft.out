@@ -1,0 +1,10 @@
+total 12
+drwxrwxr-x 2 gebravo gebravo 180 Nov  9 14:29 .
+drwxrwxr-x 4 gebravo gebravo  80 Nov  9 14:29 ..
+-rw-rw-r-- 1 gebravo gebravo   7 Nov  9 14:29 .oculto
+-rw-rw-r-- 1 gebravo gebravo   0 Jan  1  2020 antiguo
+lrwxrwxrwx 1 gebravo gebravo  10 Nov  9 14:29 enlace -> normal.txt
+lrwxrwxrwx 1 gebravo gebravo  11 Nov  9 14:29 enlace_roto -> inexistente
+-rw-rw-r-- 1 gebravo gebravo   0 Jan  1  2030 futuro
+-rw-rw-r-- 1 gebravo gebravo  18 Nov  9 14:29 normal.txt
+-rw-rw-r-- 1 gebravo gebravo  13 Nov  9 14:29 otro.txt

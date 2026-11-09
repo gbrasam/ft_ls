@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 18:35:55 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/09 15:55:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -90,6 +90,7 @@ static void	print_files(t_ctx *ctx, const t_operand_list *operand_list, const t_
 				print_long_format(ctx, operand_list->items[i].name, operand_list->items[i].name, &operand_list->items[i].st, widths);
 			else
 				fprintf(stdout, "%s\n", operand_list->items[i].name);
+			ctx->printed = true;
 		}
 		i++;
 	}
@@ -147,6 +148,20 @@ void	handle_operands(t_ctx *ctx, t_operand_list *operand_list)
 {
 	if (ctx->fatal != FATAL_NONE)
 		return ;
+	/*
+	 * Determina si deben mostrarse cabeceras en los directorios.
+	 *
+	 * - true: varios operandos o la opción -R activada.
+	 * - false: un único operando sin -R.
+	 *
+	 * Los operandos con error también cuentan, porque permanecen
+	 * en operand_list y forman parte de operand_list->count.
+	 *
+	 * ctx->printed, inicializado a false en init_ctx(),
+	 * controlará los separadores entre bloques,
+	 * no todos los saltos de línea de stdout.
+ 	*/
+	ctx->headers = (operand_list->count > 1 || ctx->opts.big_r);
 	handle_error(ctx, operand_list);
 
 	if (ctx->fatal != FATAL_NONE)
