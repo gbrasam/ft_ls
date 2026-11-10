@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:08:11 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/10 09:44:10 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 10:50:08 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,8 +35,8 @@
  */
 void	report_fatal(t_ctx *ctx)
 {
+	fflush(stdout);
 	ctx->status = 2;
-
 	if (ctx->fatal == FATAL_OPTION)
 	{
 		if (ctx->invalid_kind == ARG_LONG)
@@ -53,23 +53,38 @@ void	report_fatal(t_ctx *ctx)
 	/*
 	else if (ctx->fatal == FATAL_WRITE)
 	{
-	
+		TODO
 	}
 	*/
 }
 
-/* 
- * Informar de errores que permiten continuar
- * 
- * report_error()
- * ├── fflush(stdout)
- * ── Imprimir mensaje en stderr
- * └── Actualizar ctx->status
- * 
+/*
+ * Informa de errores que permiten continuar la ejecución
  *
-
-void	report_error()
-{
-
-}
+ * fflush(stdout) envía los datos pendientes de stdout a su destino
+ * (terminal, archivo, pipe, etc.) antes de imprimir el error en stderr
+ * Así se respeta el orden de salida cuando ambos comparten destino,
+ * siempre que fflush() termine correctamente
+ *
+ * error_errno conserva el error original, ya que fflush()
+ * podría modificar errno.
+ *
+ * 'serious' indica la gravedad del error, no su origen
+ * Puede recibir 'is_operand' cuando el error afecta a la apertura,
+ * lectura o cierre de un directorio:
+ * - true:  directorio recibido como operando (gravedad 2)
+ * - false: subdirectorio descubierto durante -R (gravedad 1)
+ * En otros errores, la gravedad se determina directamente:
+ * - Error de un operando: gravedad 2
+ * - Error de lstat() de una entrada o readlink(): gravedad 1
+ * Un error de gravedad 1 nunca rebaja un status 2 anterior
  */
+void	report_error(t_ctx *ctx, bool serious, const char *error_message, const char *path, int error_errno)
+{
+	fflush(stdout);
+	fprintf(stderr, "%s: %s '%s': %s\n", ctx->prog, error_message, path, strerror(error_errno));
+	if (serious)
+		ctx->status = 2;
+	else if (ctx->status != 2)
+		ctx->status = 1;
+}

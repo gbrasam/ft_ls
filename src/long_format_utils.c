@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/31 12:41:10 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 18:25:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 10:30:45 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -681,10 +681,7 @@ char	*read_link_target(t_ctx *ctx, const char *path, const struct stat *st)
 	n = readlink(path, target, size);															/* readlink() lee la ruta del destino almacenada en ese enlace */
 	if (n == -1)
 	{
-		fprintf(stderr, "%s: cannot read symbolic link '%s': %s\n",
-			ctx->prog, path, strerror(errno));													/* error lectura */
-		if (ctx->status == 0)
-			ctx->status = 1;
+		report_error(ctx, false, "cannot read symbolic link", path, errno);						/* error lectura */
 		free(target);
 		return (NULL);
 	}
@@ -712,10 +709,7 @@ char	*read_link_target(t_ctx *ctx, const char *path, const struct stat *st)
 		n = readlink(path, target, size);
 		if (n == -1)
 		{
-			fprintf(stderr, "%s: cannot read symbolic link '%s': %s\n",
-				ctx->prog, path, strerror(errno));												/* error lectura */
-			if (ctx->status == 0)
-				ctx->status = 1;
+			report_error(ctx, false, "cannot read symbolic link", path, errno);					/* error lectura */
 			free(target);
 			return (NULL);
 		}

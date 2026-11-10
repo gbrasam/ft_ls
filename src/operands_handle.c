@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/10 09:30:48 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 10:40:05 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,13 +41,7 @@ static void handle_error(t_ctx *ctx, t_operand_list *operand_list)
 	while (i < operand_list->count)
 	{
 		if (operand_list->items[i].kind == OPS_ERROR)
-		{
-			fprintf(stderr, "%s: cannot access '%s': %s\n",
-				ctx->prog,
-				operand_list->items[i].name,
-				strerror(operand_list->items[i].err));
-			ctx->status = 2;
-		}
+			report_error(ctx, true, "cannot access", operand_list->items[i].name, operand_list->items[i].err);
 		i++;
 	}
 }

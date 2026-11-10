@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/20 13:33:40 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 17:50:30 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 10:25:30 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,16 +37,25 @@ int calculate_capacity(size_t capacity, size_t *new_capacity)
 
 /*
  * Obtiene mediante lstat() los metadatos de cada entrada descubierta
- * con readdir() dentro de un directorio
- * 
- * Solo se llama cuando alguna opción requiere esos metadatos (-l, -t, -R)
+ * con readdir() dentro de un directorio.
  *
- * Devuelve:
- * 0: operación no fatal (aunque lstat() haya fallado)
- * 1: error fatal por fallo de memoria al construir la ruta
- * 
- * cuando falla lstat(), la función informa del error y actualiza ctx->status,
- * pero no interrumpe el recorrido del directorio
+ * Solo se llama cuando alguna opción requiere esos metadatos (-l, -t, -R).
+ *
+ * TRATAMIENTO DE ERRORES:
+ *
+ * - Si build_path() falla, establece FATAL_NOMEM y devuelve 1.
+ *
+ * - Si lstat() falla, informa del error mediante report_error()
+ *   con serious = false (gravedad 1), porque se trata de una
+ *   entrada del directorio y no de un operando original.
+ *
+ *   La entrada conserva stat_ok = 0 y puede seguir procesándose
+ *   según las reglas del programa.
+ *   No se interrumpe el recorrido del directorio.
+ *
+ * RETORNO:
+ * - 0: operación no fatal, aunque lstat() haya fallado.
+ * - 1: error fatal por fallo de memoria al construir la ruta.
  */
 int	load_stat(t_ctx *ctx, const char *directory_name, t_directory_entry *directory_entry)
 {
@@ -61,11 +70,7 @@ int	load_stat(t_ctx *ctx, const char *directory_name, t_directory_entry *directo
 	if (lstat(path, &directory_entry->st) == 0)
 		directory_entry->stat_ok = 1;
 	else
-	{
-		fprintf(stderr, "%s: cannot access '%s': %s\n", ctx->prog, path, strerror(errno));
-		if (ctx->status == 0)																							/* solo eleva el estado de 0 a 1, sin reducir un estado 2 anterior */
-			ctx->status = 1;
-	}
+		report_error(ctx, false, "cannot access", path, errno);
 	free(path);
 	return (0);
 }

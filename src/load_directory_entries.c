@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/10 09:31:01 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 10:25:28 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,11 +19,7 @@ static DIR	*open_directory(t_ctx *ctx, const char *name, bool is_operand)
 	dir = opendir(name);
 	if (!dir)
 	{
-		fprintf(stderr, "%s: cannot open directory '%s': %s\n", ctx->prog, name, strerror(errno));
-		if (is_operand)
-			ctx->status = 2;
-		else if (ctx->status != 2)
-			ctx->status = 1;
+		report_error(ctx, is_operand, "cannot open directory", name, errno);
 		return (NULL);
 	}
 	return (dir);
@@ -156,14 +152,7 @@ static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_di
 		entry = readdir(dir);
 	}
 	if (errno != 0)																										/* error de lectura */
-	{
-		fprintf(stderr, "%s: reading directory '%s': %s\n",
-			ctx->prog, directory_name, strerror(errno));
-		if (is_operand)
-			ctx->status = 2;
-		else if (ctx->status != 2)
-			ctx->status = 1;
-	}
+		report_error(ctx, is_operand, "reading directory", directory_name, errno);
 	return (0);
 }
 
@@ -200,7 +189,8 @@ static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_di
  *    - Si se produce un error fatal, devuelve 1.
  *
  * 4. closedir().
- *    - Se ejecuta incluso si read_directory() falla.
+ *    - Se ejecuta siempre que opendir() haya tenido éxito,
+ *      incluso si read_directory() devuelve un error fatal.
  *    - Evita mantener descriptores abiertos durante -R.
  *    - Si falla, informa del error y actualiza status
  *      según is_operand, sin rebajar un status = 2.
@@ -233,13 +223,6 @@ int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_l
 	flag_read = read_directory(ctx, directory_name, dir, directory_list, is_operand);
 	
 	if (closedir(dir) == -1)																							/* closedir() se ejecuta después de cualquier lectura, incluso si read_directory() falla */
-	{
-		fprintf(stderr, "%s: closing directory '%s': %s\n", ctx->prog, directory_name, strerror(errno));
-		if (is_operand)
-			ctx->status = 2;
-		else if (ctx->status != 2)
-			ctx->status = 1;
-		/* Pendiente de verificar-Equivalencia exacta con GNU ls ante un fallo de closedir() */
-	}
+		report_error(ctx, is_operand, "closing directory", directory_name, errno);
 	return (flag_read);
 }

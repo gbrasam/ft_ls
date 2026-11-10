@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 17:50:18 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 10:25:25 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -667,6 +667,7 @@ char	*read_link_target(t_ctx *ctx, const char *path, const struct stat *st);
 
 /* error.c */
 void	report_fatal(t_ctx *ctx);
+void	report_error(t_ctx *ctx, bool serious, const char *error_message, const char *path, int error_errno);
 
 /* clean.c */
 void	clean_all(t_ctx *ctx, t_operands *ops);
