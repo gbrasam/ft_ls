@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/30 12:05:33 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/10 10:25:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 12:30:55 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -67,7 +67,7 @@ typedef enum e_operand_kind
  * FATAL_OPTION (=1) -> opción de línea de comandos no válida
  * FATAL_NOMEM  (=2) -> fallo al reservar memoria dinámica
  * FATAL_CLOCK  (=3) -> fallo al consultar el reloj del sistema
- * FATAL_WRITE  (=4) -> fallo al escribir la salida (pendiente de implementar)
+ * FATAL_WRITE  (=4) -> fallo al escribir la salida
  *
  * DIFERENCIA ENTRE ERRORES RECUPERABLES Y FATALES
  *
@@ -91,7 +91,7 @@ typedef enum e_operand_kind
  * Ejemplos:
  * - Opción no válida: FATAL_OPTION.
  * - Fallo de memoria: FATAL_NOMEM.
- * - Fallo al escribir la salida: FATAL_WRITE (pendiente).
+ * - Fallo al escribir la salida: FATAL_WRITE.
  *
  * IMPORTANTE:
  * status = 2 no implica necesariamente un error fatal.
@@ -668,6 +668,7 @@ char	*read_link_target(t_ctx *ctx, const char *path, const struct stat *st);
 /* error.c */
 void	report_fatal(t_ctx *ctx);
 void	report_error(t_ctx *ctx, bool serious, const char *error_message, const char *path, int error_errno);
+void	check_stdout_error(t_ctx *ctx);
 
 /* clean.c */
 void	clean_all(t_ctx *ctx, t_operands *ops);
