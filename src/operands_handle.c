@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/15 16:09:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 18:45:35 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 09:30:48 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -128,10 +128,37 @@ static void	handle_files(t_ctx *ctx, t_operand_list *operand_list)
 /* -------------------------------------------------------- handle_directories -------------------------------------------------------- */
 
 /*
- * handle_directories() — nivel de operandos
- * Gestiona los directorios que el usuario ha pasado por argumentos
- * Su responsabilidad es recorrer operand_list, identificar los operandos OPS_DIRECTORY
- * y solicitar el procesamiento de cada uno.
+ * handle_directories() — nivel de operandos.
+ *
+ * Gestiona los directorios recibidos como argumentos de ft_ls
+ *
+ * - Recorre operand_list en el orden establecido
+ * - Procesa únicamente los operandos OPS_DIRECTORY
+ * - Si existe un error fatal, detiene el recorrido
+ * - Llama a list_directory() para procesar cada directorio
+ *
+ * El tercer argumento de list_directory() es 'is_operand'
+ * indica de dónde procede el directorio que estamos procesando:
+ *
+ * - true: el directorio procede directamente de argv
+ * - false: es un subdirectorio descubierto durante -R
+ *
+ * Aquí siempre pasamos true porque estamos recorriendo
+ * los directorios originales indicados por el usuario
+ *
+ * Esta distinción permite determinar la gravedad de
+ * los errores de opendir(), readdir() y closedir():
+ *
+ * - Operando original (true): error → ctx->status = 2.
+ * - Subdirectorio recursivo (false): error → ctx->status = 1, salvo que ya sea 2
+ *   ¡! Nunca se rebaja un status = 2 anterior
+ *
+ * Los subdirectorios descubiertos mediante -R se procesan
+ * desde handle_subdirectories(), que pasa is_operand = false
+ * 
+ * 'is_operand' no indica si una entrada es un directorio (eso ya lo indica OPS_DIRECTORY)
+ * Indica si ese directorio viene de los argumentos del usuario o de la recursión,
+ * para aplicar la gravedad correcta a sus errores
  */
 static void	handle_directories(t_ctx *ctx, t_operand_list *operand_list)
 {

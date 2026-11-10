@@ -6,13 +6,20 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 15:08:11 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 13:10:20 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 09:44:10 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
 /* 
+ * Informar de errores que impiden continuar
+ *
+ * report_fatal()
+ * ├── fflush(stdout)
+ * ├── Imprimir mensaje fatal
+ * └── Establecer ctx->status = 2
+ * 
  * [GNU] 'ctx->prog' conserva argv[0] para reproducir el prefijo
  *       utilizado en los mensajes de error.
  * root@debian-4gb-ft-linux-x86:~# LC_ALL=C ls -j 1>/tmp/ls_out 2>/tmp/ls_err; printf 'status=%d\n' "$?"; cat /tmp/ls_err
@@ -50,3 +57,19 @@ void	report_fatal(t_ctx *ctx)
 	}
 	*/
 }
+
+/* 
+ * Informar de errores que permiten continuar
+ * 
+ * report_error()
+ * ├── fflush(stdout)
+ * ── Imprimir mensaje en stderr
+ * └── Actualizar ctx->status
+ * 
+ *
+
+void	report_error()
+{
+
+}
+ */

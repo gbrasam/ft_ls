@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 17:50:28 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 09:31:01 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -90,49 +90,56 @@ static int	store_entry(t_ctx *ctx, const char *directory_name, const char *entry
 }
 
 /*
- * Lee las entradas del directorio mediante readdir() y guarda
- * las seleccionadas en list
+ * Lee las entradas de un directorio abierto mediante readdir().
  *
- * Retorno:
- *   0: lectura completada correctamente
- *   1: error de lectura (recuperable, ctx->status) o
- *      error de memoria (fatal, ctx->fatal)
+ * - Aplica el filtro de visibilidad según la opción -a.
+ * - Almacena las entradas seleccionadas mediante store_entry().
+ * - No ordena ni imprime las entradas.
  *
- * struct dirent (<dirent.h>) representa una entrada del directorio
- * readdir() devuelve un puntero a esta estructura.
+ * readdir() devuelve NULL cuando:
+ * - Se alcanza el final del directorio (errno == 0).
+ * - Se produce un error de lectura (errno != 0).
  *
- * Campos relevantes:
- *   d_name: nombre de la entrada (ej. "main.c")
- *   d_ino:  número de inodo
- *   d_type: tipo de entrada (DT_DIR, DT_REG, etc.)
+ * errno se pone a 0 antes de cada llamada a readdir(),
+ * porque otras funciones ejecutadas durante el bucle
+ * pueden modificarlo.
  *
- * d_type puede valer DT_UNKNOWN, por lo que no siempre permite
- * determinar el tipo de entrada.
+ * TRATAMIENTO DE ERRORES:
  *
- * Guardamos d_type en nuestra estructura porque lstat() puede
- * fallar después de que readdir() haya encontrado la entrada.
- * Así conservamos el tipo indicado por readdir(), si se conoce.
+ * 1. Si store_entry() devuelve 1:
+ *    - Se ha producido un error fatal.
+ *    - Se devuelve 1 para impedir la impresión.
  *
- * Para obtener los metadatos de las entradas utilizamos lstat().
+ * 2. Si readdir() falla:
+ *    - Se informa del error.
+ *    - is_operand determina su gravedad:
+ *      · true: directorio recibido como operando (status = 2).
+ *      · false: subdirectorio descubierto con -R (status = 1).
+ *    - Nunca se rebaja un status = 2 anterior.
+ *    - Se devuelve 0 para conservar e imprimir las entradas
+ *      que ya se habían almacenado correctamente.
  *
- * readdir() devuelve NULL tanto al finalizar el directorio como
- * si se produce un error. Para distinguir ambos casos:
- *   - Se establece errno = 0 antes de llamar a readdir()
- *   - NULL y errno == 0: fin normal del directorio
- *   - NULL y errno != 0: error de lectura
+ *    IMPORTANTE:
+ *    El valor de retorno indica si podemos continuar utilizando
+ *    las entradas almacenadas, no si toda la lectura tuvo éxito.
  *
- * La memoria devuelta por readdir() no nos pertenece y puede
- * reutilizarse en llamadas posteriores. Por eso, store_entry()
- * copia el nombre con strdup() para conservarlo en list
- * y guarda el valor de d_type en nuestra estructura.
+ *    Ejemplo:
+ *      readdir() -> archivo1 -> almacenado
+ *      readdir() -> archivo2 -> almacenado
+ *      readdir() -> ERROR
  *
- * ctx->opts.a || entry->d_name[0] != '.'
- * ctx->opts.a vale 1 cuando el usuario ha indicado -a
- * entry->d_name es la cadena con el nombre devuelto por readdir()
- * entry->d_name[0] es el primer carácter de esa cadena
+ *    La función informa del error y actualiza ctx->status,
+ *    pero devuelve 0 para que list_directory() pueda imprimir
+ *    archivo1 y archivo2.
  *
+ * RETORNO:
+ * - 0: lectura completa o parcial aprovechable.
+ * - 1: error fatal durante el almacenamiento.
+ *
+ * El cierre del directorio se realiza posteriormente
+ * desde load_directory_entries().
  */
-static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_directory_list *directory_list)
+static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_directory_list *directory_list, bool is_operand)
 {
 	struct dirent	*entry;
 
@@ -152,49 +159,62 @@ static int	read_directory(t_ctx *ctx, const char *directory_name, DIR *dir, t_di
 	{
 		fprintf(stderr, "%s: reading directory '%s': %s\n",
 			ctx->prog, directory_name, strerror(errno));
-		ctx->status = 2;
-		return (1);
+		if (is_operand)
+			ctx->status = 2;
+		else if (ctx->status != 2)
+			ctx->status = 1;
 	}
 	return (0);
 }
 
 /*
- * 'load_directory_entries' gestiona la apertura, lectura y cierre
- * de un directorio, sin encargarse de ordenar ni imprimir.
+ * Gestiona la apertura, lectura y cierre de un directorio.
  *
- * Workflow:
+ * También imprime el separador y la cabecera del directorio
+ * antes de leer sus entradas, pero no ordena ni imprime
+ * las entradas almacenadas.
+ *
  * 1. open_directory() -> opendir().
  *    - Si falla, informa del error y devuelve 1.
- *    - is_operand distingue el origen del directorio:
+ *    - is_operand identifica el origen del directorio:
  *      · true: operando original de argv.
  *      · false: subdirectorio descubierto durante -R.
- *    - Gravedad del error de apertura:
+ *    - Gravedad del error:
  *      · Operando: status = 2.
  *      · Subdirectorio: status = 1.
  *      · Nunca reducir un status = 2 anterior.
  *
- * 2. read_directory() -> readdir() y store_entry().
- *    - Lee y almacena las entradas visibles según -a.
- *    - Devuelve el resultado de la lectura.
+ * 2. Separador y cabecera.
+ *    - Solo se imprimen si opendir() ha funcionado.
+ *    - Si ctx->printed, imprime un salto de línea para
+ *      separar este bloque del anterior.
+ *    - Si ctx->headers, imprime "directory_name:".
+ *    - Se imprimen ANTES de llamar a read_directory().
+ *    - Así, los errores de lstat() de las entradas se generan
+ *      después de la cabecera correspondiente.
  *
- * 3. closedir().
+ * 3. read_directory() -> readdir() y store_entry().
+ *    - Lee y almacena las entradas visibles según -a.
+ *    - Si readdir() falla, informa del error y actualiza status,
+ *      pero devuelve 0 para conservar las entradas ya leídas.
+ *    - Si se produce un error fatal, devuelve 1.
+ *
+ * 4. closedir().
  *    - Se ejecuta incluso si read_directory() falla.
  *    - Evita mantener descriptores abiertos durante -R.
  *    - Si falla, informa del error y actualiza status
  *      según is_operand, sin rebajar un status = 2.
+ *    - Un error de cierre no descarta las entradas leídas.
  *
- * Devuelve:
- * - 1 si falla la apertura.
- * - En otro caso, devuelve el resultado de read_directory().
+ * RETORNO:
+ * - 0: lectura completa o parcial aprovechable.
+ * - 1: error de apertura o error fatal durante la lectura.
  *
- * La ordenación, impresión y recursividad se gestionan
- * posteriormente desde list_directory().
+ * Un error parcial de readdir() se registra en ctx->status,
+ * pero no impide imprimir las entradas almacenadas.
  *
- * TODO (Etapa 8):
- * - Revisar el tratamiento de errores de readdir(),
- *   incluida la conservación de entradas leídas parcialmente.
- * - Verificar frente a GNU ls la gravedad de los errores
- *   de readdir() y closedir() en operandos y subdirectorios.
+ * La ordenación, impresión de entradas y recursividad
+ * se gestionan posteriormente desde list_directory().
  */
 int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_list *directory_list, bool is_operand)
 {
@@ -204,7 +224,14 @@ int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_l
 	dir = open_directory(ctx, directory_name, is_operand);
 	if (!dir)
 		return (1);
-	flag_read = read_directory(ctx, directory_name, dir, directory_list);
+
+	if (ctx->printed)
+		printf("\n");
+	if (ctx->headers)
+		printf("%s:\n", directory_name);
+
+	flag_read = read_directory(ctx, directory_name, dir, directory_list, is_operand);
+	
 	if (closedir(dir) == -1)																							/* closedir() se ejecuta después de cualquier lectura, incluso si read_directory() falla */
 	{
 		fprintf(stderr, "%s: closing directory '%s': %s\n", ctx->prog, directory_name, strerror(errno));
@@ -216,90 +243,3 @@ int	load_directory_entries(t_ctx *ctx, const char *directory_name, t_directory_l
 	}
 	return (flag_read);
 }
-
- /*
- * TODO — ETAPA 8: errores recuperables durante la lectura del directorio.
- *
- * PROBLEMA ACTUAL
- *
- * load_directory_entries() devuelve:
- * - 0: lectura completada y sin error fatal.
- * - 1: no se puede continuar con el listado.
- *
- * Actualmente, si readdir() falla después de haber leído algunas
- * entradas, se descartan de la impresión las entradas almacenadas.
- *
- * Sin embargo, hay que distinguir tres situaciones:
- *
- * 1. ERROR DE APERTURA — opendir()
- *    - No se ha podido abrir el directorio.
- *    - Informar del error y actualizar ctx->status.
- *    - No imprimir cabecera ni entradas.
- *    - No es un error fatal.
- *
- * 2. ERROR DE LECTURA — readdir()
- *    - El directorio se ha abierto correctamente.
- *    - La lectura se interrumpe antes de terminar.
- *    - Informar del error y actualizar ctx->status.
- *    - Conservar las entradas almacenadas hasta ese momento.
- *    - Ordenar e imprimir esas entradas y la cabecera, si procede.
- *    - No es un error fatal.
- *
- * 3. ERROR DE MEMORIA — FATAL_NOMEM
- *    - Falla una reserva de memoria durante el procesamiento
- *      (realloc(), strdup() o build_path()).
- *    - Establecer ctx->fatal = FATAL_NOMEM.
- *    - No continuar el procesamiento normal ni imprimir el listado.
- *    - Liberar los recursos reservados.
- *
- * DECISIÓN DE DISEÑO [ELEGIDA]
- *
- * Mantener ctx->fatal para identificar los errores fatales.
- * No introducir tres códigos de retorno en read_directory().
- *
- * ctx->status representa el estado de salida global.
- * ctx->fatal indica si debe detenerse el procesamiento normal.
- *
- * PENDIENTE DE RESOLVER
- *
- * Distinguir el fallo de opendir() del fallo recuperable de
- * readdir(), ya que ambos pueden ocurrir con ctx->fatal == FATAL_NONE.
- *
- * No basta con comprobar únicamente ctx->fatal.
- *
- * REVISAR list_directory()
- *
- * Actualmente solo procesa el listado cuando:
- *
- *     load_directory_entries(...) == 0
- *
- * Esta condición deberá adaptarse para permitir:
- *
- * - Apertura fallida: no imprimir cabecera ni entradas.
- * - Lectura completa: imprimir cabecera y entradas.
- * - Lectura parcial: imprimir cabecera y entradas recuperadas.
- * - Error fatal: no imprimir y detener el procesamiento normal.
- *
- * La cabecera solo se imprime cuando ctx->headers es true.
- * Un directorio abierto y vacío también puede tener cabecera.
- *
- * LIMPIEZA DE RECURSOS
- *
- * - Cerrar el directorio siempre que opendir() haya tenido éxito.
- * - Liberar la memoria de la lista en todos los caminos de salida.
- *
- * OTROS ERRORES YA CONTEMPLADOS
- *
- * - lstat() de una entrada: continuar la lectura; conservar
- *   la entrada con stat_ok = 0 y actualizar ctx->status.
- * - closedir() después de leer: informar del error y actualizar
- *   ctx->status, sin descartar las entradas ya almacenadas.
- *
- * OBJETIVO
- *
- * Recuperar e imprimir las entradas disponibles ante un error
- * de lectura no fatal, sin confundirlo con un fallo de apertura
- * ni con un error fatal de memoria.
- *
- * No implementar durante la Etapa 6.
- */

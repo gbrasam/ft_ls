@@ -6,7 +6,7 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/16 12:09:45 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/09 17:50:25 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/10 09:30:51 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,42 +41,52 @@ static void	handle_subdirectories(t_ctx *ctx, t_directory_list *directory_list)
 }
 
 /*
- * 'list_directory' se ocupa del ciclo de vida de un directorio concreto:
- *  |
- *  +-- init_directory_list()
- *  |
- *  +-- load_directory_entries()
- *  |       1. opendir()
- *  |       2. readdir() -> guardar entradas
- *  |       3. closedir()
- *  |
- *  +-- Si la carga ha tenido éxito:
- *  |       4. Imprimir separador de bloque (si ctx->printed)
- *  |       5. Imprimir cabecera (si ctx->headers)
- *  |       6. handle_directory_entries()
- *  |          -> ordenar, calcular anchos e imprimir entradas
- *  |
- *  |       7. Coordinar la recursividad -R:
- *  |          |
- *  |          +-- Si -R está activada:
- *  |              Recorrer las entradas ya ordenadas.
- *  |              |
- *  |              +-- Para cada subdirectorio válido:
- *  |                  - stat_ok == 1 y S_ISDIR().
- *  |                  - Excluir siempre "." y "..", incluso con -a.
- *  |                  - Respetar la visibilidad de -a.
- *  |                  - No seguir enlaces simbólicos:
- *  |                    lstat() + S_ISDIR() los excluye.
- *  |                  |
- *  |                  +-- Construir la ruta completa.
- *  |                  +-- Llamar a list_directory(ruta).
- *  |                  +-- Liberar la ruta reservada.
- *  |
- *  |          Primero se imprime todo el directorio actual.
- *  |          Después se recorren sus subdirectorios en el
- *  |          orden establecido por la ordenación activa (-t, -r).
- *  |
- *  +-- clean_directory_list()
+ * Función coordinadora del procesamiento de un directorio.
+ *
+ * list_directory() gestiona el procesamiento de un directorio
+ * concreto y coordina su impresión y la recursividad con -R.
+ *
+ * 1. init_directory_list()
+ *    - Inicializa la estructura donde se almacenarán las entradas.
+ *
+ * 2. load_directory_entries()
+ *    - Abre el directorio mediante opendir()
+ *    - Si la apertura funciona:
+ *      · Imprime el separador de bloques si 'ctx->printed'
+ *      · Imprime la cabecera si 'ctx->headers'
+ *      · Lee y almacena las entradas mediante 'readdir()'
+ *      · Cierra el directorio mediante 'closedir()'
+ *    - Si opendir() falla, no imprime separador ni cabecera
+ *
+ * 3. Si la carga devuelve 0:
+ *    - handle_directory_entries():
+ *      · Ordena las entradas según las opciones activas.
+ *      · Calcula los anchos y los bloques para -l.
+ *      · Imprime las entradas.
+ *
+ *    - Marca ctx->printed = true para indicar que el bloque
+ *      del directorio ya se ha procesado.
+ *
+ *    - Si -R está activada y no hay error fatal:
+ *      · Recorre las entradas en el orden establecido.
+ *      · Excluye siempre "." y "..", incluso con -a.
+ *      · Respeta la visibilidad de -a.
+ *      · No sigue enlaces simbólicos a directorios.
+ *      · Construye la ruta completa de cada subdirectorio.
+ *      · Llama recursivamente a list_directory().
+ *      · Libera la ruta reservada.
+ *
+ *    Primero se imprimen las entradas del directorio actual.
+ *    Después se procesan sus subdirectorios.
+ *
+ * 4. clean_directory_list()
+ *    - Libera las entradas almacenadas, incluso si falla
+ *      la carga del directorio.
+ *
+ * IMPORTANTE:
+ * - El separador y la cabecera se imprimen ANTES de readdir().
+ * - Los errores de lstat() de las entradas se producen
+ *   después de la cabecera del directorio correspondiente.
  */
 void	list_directory(t_ctx *ctx, const char *directory_name, bool is_operand)
 {
@@ -85,10 +95,6 @@ void	list_directory(t_ctx *ctx, const char *directory_name, bool is_operand)
 	init_directory_list(directory_name, &directory_list);
 	if (load_directory_entries(ctx, directory_name, &directory_list, is_operand) == 0)
 	{
-		if (ctx->printed)
-			printf("\n");
-		if (ctx->headers)
-			printf("%s:\n", directory_name);
 		handle_directory_entries(ctx, &directory_list);
 		ctx->printed = true;
 		if (ctx->opts.big_r && ctx->fatal == FATAL_NONE)
