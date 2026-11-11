@@ -6,39 +6,46 @@
 /*   By: gebravo <gebravo@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/10/02 08:43:05 by gebravo           #+#    #+#             */
-/*   Updated: 2026/11/08 18:25:05 by gebravo          ###   ########.fr       */
+/*   Updated: 2026/11/11 11:15:10 by gebravo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_ls.h"
 
 /**
- * Inicializa el contexto general
- * Se ejecuta antes de procesar los operandos
+ * Inicializa el contexto general.
+ * Se ejecuta antes de procesar los operandos.
  *
- * void *memset(void *s, int c, size_t n);
- * s -> dirección donde empezar
- * c -> valor con el que rellenar
- * n -> número de bytes que queremos rellenar con ese valor
+ * (t_ctx){0} es un literal compuesto (compound literal) de C99.
+ * Crea un objeto de tipo t_ctx inicializado mediante {0}.
+ * No es un cast del entero 0 al tipo t_ctx.
  *
- * memset(ctx, 0, sizeof(*ctx)) pone a 0 todos los bytes de la
- * estructura t_ctx a la que apunta ctx.
+ * *ctx = (t_ctx){0} asigna ese objeto completo a la estructura
+ * apuntada por ctx, inicializando también sus miembros anidados:
+ * - Punteros: NULL.
+ * - Enteros: 0.
+ * - Booleanos: false.
+ * - Enumeraciones: valor 0.
  *
- * sizeof(*ctx) obtiene el tamaño de la estructura t_ctx, no el
- * tamaño del puntero ctx.
+ * A diferencia de memset(), la inicialización respeta los tipos
+ * de C y no depende de que los punteros nulos se representen
+ * internamente mediante bytes a cero.
  *
- * Al hacer ctx->prog = prog se copia la dirección almacenada en prog,
- * no el contenido almacenado en la dirección a la que apunta.
+ * ctx->prog = prog copia la dirección almacenada en prog,
+ * no la cadena a la que apunta. Ambos punteros comparten
+ * la misma cadena, sin reservar memoria adicional.
  *
  * prog ---------+
  *               +--> "./ft_ls\0"
  * ctx->prog ----+
+ *
+ * ctx->fatal = FATAL_NONE establece explícitamente el estado
+ * semántico inicial, sin depender del valor del enumerador.
  */
 void	init_ctx(t_ctx *ctx, const char *prog)
 {
-	memset(ctx, 0, sizeof(*ctx));
+	*ctx = (t_ctx){0};
 	ctx->prog = prog;
-	ctx->invalid = NULL;
 	ctx->fatal = FATAL_NONE;
 }
 
